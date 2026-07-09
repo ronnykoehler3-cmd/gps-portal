@@ -1,0 +1,29 @@
+﻿# Allgemein
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+
+# Windows
+desktop.ini
+$RECYCLE.BIN/
+
+# VS Code
+.vscode/
+
+# PHP
+vendor/
+
+# Node
+node_modules/
+
+# Build
+dist/
+build/
+target/
+
+# Environment
+.env
+.env.local
+

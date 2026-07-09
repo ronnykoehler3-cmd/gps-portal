@@ -1,0 +1,13 @@
+﻿name: Feature Request
+description: Neue Funktion oder Idee
+title: "[FEATURE] "
+labels: ["feature"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Beschreibung
+      description: Was soll ergaenzt werden?
+    validations:
+      required: true
+
