@@ -1,0 +1,356 @@
+<?php
+
+defined('_JEXEC') or die;
+
+require_once dirname(__DIR__) . '/navigation.php';
+
+$lat = $this->position['latitude'] ?? 0;
+$lon = $this->position['longitude'] ?? 0;
+
+$battery =
+    $this->position['attributes']['batteryLevel'] ?? '';
+
+$activity =
+    $this->position['attributes']['activity'] ?? '';
+
+$speed =
+    $this->position['speed'] ?? 0;
+?>
+
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<script
+src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
+
+<div class="container-fluid">
+
+    <h1>Fahrzeugdetails</h1>
+
+	<div class="row mb-4">
+
+<?php foreach ($this->devices as $device): ?>
+
+<?php
+
+$devicePosition = null;
+
+foreach ($this->positions as $position)
+{
+    if ((int)$position['deviceId'] === (int)$device['id'])
+    {
+        $devicePosition = $position;
+        break;
+    }
+}
+
+$batt =
+    $devicePosition['attributes']['batteryLevel']
+    ?? '-';
+
+$activityInfo =
+    $devicePosition['attributes']['activity']
+    ?? '-';
+
+?>
+
+<div class="col-md-6 mb-3">
+
+    <div class="card">
+
+        <div class="card-body">
+
+            <h5>
+                🚗 <?php echo htmlspecialchars($device['name']); ?>
+            </h5>
+
+
+            <p>
+                <strong>Akku:</strong>
+                <?php echo $batt; ?> %
+            </p>
+
+            <p>
+                <strong>Aktivität:</strong>
+                <?php echo htmlspecialchars($activityInfo); ?>
+            </p>
+
+<?php
+
+$lastUpdate =
+    $device['lastUpdate'] ?? '';
+
+$statusText = '🔴 Offline';
+
+$statusBadge =
+    '<span class="badge bg-danger">OFFLINE</span>';
+
+if (!empty($lastUpdate))
+{
+    $updateTime = strtotime($lastUpdate);
+
+    $minutes =
+        (time() - $updateTime) / 60;
+
+    if ($minutes <= 5)
+    {
+        $statusBadge =
+            '<span class="badge bg-success">ONLINE</span>';
+    }
+    elseif ($minutes <= 60)
+    {
+        $statusBadge =
+            '<span class="badge bg-warning text-dark">KÜRZLICH AKTIV</span>';
+    }
+
+    $date = new DateTime(
+        $device['lastUpdate']
+    );
+
+    $date->setTimezone(
+        new DateTimeZone('Europe/Berlin')
+    );
+
+    $lastUpdate =
+        $date->format(
+            'd.m.Y H:i'
+        ) . ' Uhr';
+}
+
+?>
+
+<p>
+    <strong>Status:</strong>
+    <?php echo $statusBadge; ?>
+</p>
+<p>
+    <strong>Letztes Update:</strong>
+    <?php echo $lastUpdate; ?>
+</p>
+            <a
+                class="btn btn-primary"
+                href="index.php?option=com_gpsportal&view=vehicle&deviceId=<?php echo (int)$device['id']; ?>">
+                Anzeigen
+            </a>
+
+        </div>
+
+    </div>
+
+</div>
+
+<?php endforeach; ?>
+
+</div>
+    <form method="get">
+
+        <input
+            type="hidden"
+            name="option"
+            value="com_gpsportal">
+
+        <input
+            type="hidden"
+            name="view"
+            value="vehicle">
+
+        <div class="mb-3">
+
+            <label class="form-label">
+                Fahrzeug auswählen
+            </label>
+
+            <select
+                class="form-select"
+                name="deviceId"
+                onchange="this.form.submit()">
+
+                <?php foreach ($this->devices as $device): ?>
+
+                    <option
+                        value="<?php echo (int)$device['id']; ?>"
+                        <?php echo ((int)$device['id'] === (int)$this->deviceId) ? 'selected' : ''; ?>>
+
+                        <?php echo htmlspecialchars($device['name']); ?>
+
+                    </option>
+
+                <?php endforeach; ?>
+
+            </select>
+
+        </div>
+
+    </form>
+
+    <h3>
+        <?php echo htmlspecialchars($this->deviceName); ?>
+    </h3>
+
+    <div class="alert alert-success">
+        Live-Aktualisierung aktiv
+    </div>
+
+    <div class="card mb-3">
+
+        <div class="card-body">
+
+            <p>
+                <strong>Breitengrad:</strong>
+                <span id="latitude"><?php echo $lat; ?></span>
+            </p>
+
+            <p>
+                <strong>Längengrad:</strong>
+                <span id="longitude"><?php echo $lon; ?></span>
+            </p>
+
+            <p>
+                <strong>Geschwindigkeit:</strong>
+                <span id="speed"><?php echo $speed; ?></span>
+                km/h
+            </p>
+
+            <p>
+                <strong>Batterie:</strong>
+                <span id="battery"><?php echo $battery; ?></span>
+                %
+            </p>
+
+            <p>
+                <strong>Aktivität:</strong>
+                <span id="activity"><?php echo $activity; ?></span>
+            </p>
+
+            <a
+                id="gmaps"
+                target="_blank"
+                class="btn btn-primary"
+                href="https://maps.google.com/?q=<?php echo $lat; ?>,<?php echo $lon; ?>">
+                Position in Google Maps öffnen
+            </a>
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="card-header">
+            Aktuelle Position
+        </div>
+
+        <div class="card-body">
+
+            <div
+                id="map"
+                style="height:500px;">
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+var deviceId =
+    <?php echo (int)$this->deviceId; ?>;
+
+var map = L.map('map').setView(
+[
+<?php echo $lat; ?>,
+<?php echo $lon; ?>
+],
+15
+);
+
+L.tileLayer(
+'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+{
+maxZoom: 19
+}
+).addTo(map);
+
+var marker = L.marker(
+[
+<?php echo $lat; ?>,
+<?php echo $lon; ?>
+]
+)
+.addTo(map)
+.bindPopup(
+'<?php echo addslashes($this->deviceName); ?>'
+)
+.openPopup();
+
+async function refreshVehicle()
+{
+    try
+    {
+        let response =
+            await fetch(
+                'index.php?option=com_gpsportal&view=api&deviceId='
+                + deviceId
+            );
+
+        let data =
+            await response.json();
+
+        if (!data.latitude)
+        {
+            return;
+        }
+
+        marker.setLatLng([
+            data.latitude,
+            data.longitude
+        ]);
+
+        document.getElementById(
+            'latitude'
+        ).innerText =
+            data.latitude;
+
+        document.getElementById(
+            'longitude'
+        ).innerText =
+            data.longitude;
+
+        document.getElementById(
+            'speed'
+        ).innerText =
+            data.speed ?? 0;
+
+        document.getElementById(
+            'battery'
+        ).innerText =
+            data.attributes?.batteryLevel ?? '';
+
+        document.getElementById(
+            'activity'
+        ).innerText =
+            data.attributes?.activity ?? '';
+
+        document.getElementById(
+            'gmaps'
+        ).href =
+            'https://maps.google.com/?q='
+            + data.latitude
+            + ','
+            + data.longitude;
+    }
+    catch(e)
+    {
+        console.log(e);
+    }
+}
+
+setInterval(
+    refreshVehicle,
+    5000
+);
+
+</script>

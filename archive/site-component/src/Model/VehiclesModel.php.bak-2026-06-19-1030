@@ -1,0 +1,360 @@
+<?php
+
+namespace TKKundendienst\Component\Gpsportal\Site\Model;
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+use Joomla\CMS\MVC\Model\BaseDatabaseModel;
+
+class VehiclesModel extends BaseDatabaseModel
+{
+    private function getTraccarSettings()
+    {
+        $db = Factory::getContainer()->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+            ->select(['setting_key', 'setting_value'])
+            ->from('#__gpsportal_settings');
+
+        $db->setQuery($query);
+
+        return $db->loadAssocList(
+            'setting_key',
+            'setting_value'
+        );
+    }
+
+    private function findTraccarDeviceByUniqueId(string $uniqueId): int
+    {
+        $settings = $this->getTraccarSettings();
+
+        $ch = curl_init();
+
+        curl_setopt_array($ch, [
+
+            CURLOPT_URL =>
+                rtrim(
+                    $settings['traccar_url'],
+                    '/'
+                ) . '/api/devices',
+
+            CURLOPT_RETURNTRANSFER => true,
+
+            CURLOPT_USERPWD =>
+                $settings['traccar_user']
+                . ':'
+                . $settings['traccar_password'],
+
+            CURLOPT_SSL_VERIFYPEER => false
+        ]);
+
+        $response = curl_exec($ch);
+
+        curl_close($ch);
+
+        $devices = json_decode(
+            $response,
+            true
+        );
+
+        if (!is_array($devices))
+        {
+            return 0;
+        }
+
+        foreach ($devices as $device)
+        {
+            if (
+                isset($device['uniqueId'])
+                && trim($device['uniqueId']) === trim($uniqueId)
+            )
+            {
+                return (int) $device['id'];
+            }
+        }
+
+        return 0;
+    }
+
+    private function createTraccarDevice(
+        string $name,
+        string $uniqueId
+    ): int
+    {
+        $settings =
+            $this->getTraccarSettings();
+
+        $payload = json_encode([
+            'name'     => $name,
+            'uniqueId' => $uniqueId
+        ]);
+
+        $ch = curl_init();
+
+        curl_setopt_array($ch, [
+
+            CURLOPT_URL =>
+                rtrim(
+                    $settings['traccar_url'],
+                    '/'
+                ) . '/api/devices',
+
+            CURLOPT_RETURNTRANSFER => true,
+
+            CURLOPT_POST => true,
+
+            CURLOPT_POSTFIELDS => $payload,
+
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json'
+            ],
+
+            CURLOPT_USERPWD =>
+                $settings['traccar_user']
+                . ':'
+                . $settings['traccar_password'],
+
+            CURLOPT_SSL_VERIFYPEER => false
+        ]);
+
+        $response =
+            curl_exec($ch);
+
+        curl_close($ch);
+
+        $device =
+            json_decode(
+                $response,
+                true
+            );
+
+        return (int)
+            ($device['id'] ?? 0);
+    }
+
+    public function getVehicles()
+    {
+        $user = Factory::getApplication()->getIdentity();
+
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+
+            ->select('d.*')
+
+            ->from(
+                $db->quoteName(
+                    '#__gpsportal_devices',
+                    'd'
+                )
+            )
+
+            ->join(
+                'INNER',
+                $db->quoteName(
+                    '#__gpsportal_user_devices',
+                    'ud'
+                )
+                . ' ON ud.device_id = d.id'
+            )
+
+            ->where(
+                'ud.user_id = '
+                . (int) $user->id
+            )
+
+            ->order('d.name ASC');
+
+        $db->setQuery($query);
+
+        return $db->loadObjectList();
+    }
+
+    public function getVehicle(int $id)
+    {
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+            ->select('*')
+            ->from('#__gpsportal_devices')
+            ->where('id=' . (int) $id);
+
+        $db->setQuery($query);
+
+        return $db->loadObject();
+    }
+
+    public function saveVehicle(array $data)
+    {
+        $user = Factory::getApplication()->getIdentity();
+
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $traccarId =
+            $this->findTraccarDeviceByUniqueId(
+                $data['tracker_unique_id']
+            );
+
+        if (!$traccarId)
+        {
+            $traccarId =
+                $this->createTraccarDevice(
+                    $data['name'],
+                    $data['tracker_unique_id']
+                );
+        }
+
+        if (!$traccarId)
+        {
+            throw new \RuntimeException(
+                'Traccar-Gerät konnte nicht gefunden oder angelegt werden'
+            );
+        }
+
+        $vehicle = (object) [
+
+            'traccar_device_id' =>
+                $traccarId,
+
+            'tracker_unique_id' =>
+                $data['tracker_unique_id'],
+
+            'name' =>
+                $data['name'],
+
+            'license_plate' =>
+                $data['license_plate'],
+
+            'vehicle_type' =>
+                $data['vehicle_type'],
+
+            'manufacturer' =>
+                $data['manufacturer'],
+
+            'model' =>
+                $data['model'],
+
+            'driver' =>
+                $data['driver'],
+
+            'cost_center' =>
+                $data['cost_center'],
+
+            'color' =>
+                $data['color'],
+
+            'notes' =>
+                $data['notes'],
+
+            'created' =>
+                date('Y-m-d H:i:s')
+        ];
+
+        $db->insertObject(
+            '#__gpsportal_devices',
+            $vehicle,
+            'id'
+        );
+
+        $link = (object) [
+
+            'user_id' =>
+                (int) $user->id,
+
+            'device_id' =>
+                (int) $vehicle->id,
+
+            'created' =>
+                date('Y-m-d H:i:s')
+        ];
+
+        $db->insertObject(
+            '#__gpsportal_user_devices',
+            $link
+        );
+
+        return true;
+    }
+
+    public function updateVehicle(
+        int $id,
+        array $data
+    )
+    {
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $vehicle = (object) [
+
+            'id' =>
+                $id,
+
+            'tracker_unique_id' =>
+                $data['tracker_unique_id'],
+
+            'name' =>
+                $data['name'],
+
+            'license_plate' =>
+                $data['license_plate'],
+
+            'vehicle_type' =>
+                $data['vehicle_type'],
+
+            'manufacturer' =>
+                $data['manufacturer'],
+
+            'model' =>
+                $data['model'],
+
+            'driver' =>
+                $data['driver'],
+
+            'cost_center' =>
+                $data['cost_center'],
+
+            'color' =>
+                $data['color'],
+
+            'notes' =>
+                $data['notes'],
+
+            'modified' =>
+                date('Y-m-d H:i:s')
+        ];
+
+        $db->updateObject(
+            '#__gpsportal_devices',
+            $vehicle,
+            'id'
+        );
+
+        return true;
+    }
+
+    public function deleteVehicle(int $id)
+    {
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+            ->delete('#__gpsportal_user_devices')
+            ->where('device_id=' . (int) $id);
+
+        $db->setQuery($query);
+        $db->execute();
+
+        $query = $db->getQuery(true)
+            ->delete('#__gpsportal_devices')
+            ->where('id=' . (int) $id);
+
+        $db->setQuery($query);
+        $db->execute();
+
+        return true;
+    }
+}

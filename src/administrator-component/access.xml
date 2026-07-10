@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<access component="com_gpsportal">
+
+    <section name="component">
+
+        <action
+            name="core.admin"
+            title="JACTION_ADMIN"
+            description="JACTION_ADMIN_COMPONENT_DESC" />
+
+        <action
+            name="core.manage"
+            title="JACTION_MANAGE"
+            description="JACTION_MANAGE_COMPONENT_DESC" />
+
+        <action
+            name="gpsportal.admin"
+            title="GPS Administrator"
+            description="Vollzugriff auf GPS Portal" />
+
+        <action
+            name="gpsportal.companyadmin"
+            title="Firmenadministrator"
+            description="Verwaltung eigener Firmen" />
+
+        <action
+            name="gpsportal.dispatcher"
+            title="Disponent"
+            description="Tracking und Geräteverwaltung" />
+
+        <action
+            name="gpsportal.driver"
+            title="Fahrer"
+            description="Nur Leserechte" />
+
+    </section>
+
+</access>

@@ -1,0 +1,17 @@
+<?php
+defined('_JEXEC') or die;
+?>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <jdoc:include type="metas" />
+    <jdoc:include type="styles" />
+    <jdoc:include type="scripts" />
+</head>
+
+<body>
+
+<jdoc:include type="component" />
+
+</body>
+</html>

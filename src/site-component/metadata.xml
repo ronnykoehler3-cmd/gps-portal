@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<metadata>
+
+    <menu
+        view="portal"
+        title="COM_GPSPORTAL_PORTAL"
+        option="com_gpsportal" />
+
+    <menu
+        view="dashboard"
+        title="COM_GPSPORTAL_DASHBOARD"
+        option="com_gpsportal" />
+
+    <menu
+        view="livemap"
+        title="COM_GPSPORTAL_LIVEMAP"
+        option="com_gpsportal" />
+
+    <menu
+        view="vehicles"
+        title="COM_GPSPORTAL_VEHICLES"
+        option="com_gpsportal" />
+
+    <menu
+        view="history"
+        title="COM_GPSPORTAL_HISTORY"
+        option="com_gpsportal" />
+
+    <menu
+        view="logbook"
+        title="COM_GPSPORTAL_LOGBOOK"
+        option="com_gpsportal" />
+
+    <menu
+        view="reports"
+        title="COM_GPSPORTAL_REPORTS"
+        option="com_gpsportal" />
+
+    <menu
+        view="geofences"
+        title="COM_GPSPORTAL_GEOFENCES"
+        option="com_gpsportal" />
+
+    <menu
+        view="documents"
+        title="COM_GPSPORTAL_DOCUMENTS"
+        option="com_gpsportal" />
+
+    <menu
+        view="settings"
+        title="COM_GPSPORTAL_SETTINGS"
+        option="com_gpsportal" />
+
+</metadata>

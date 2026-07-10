@@ -1,0 +1,163 @@
+<?php
+
+namespace TKKundendienst\Component\Gpsportal\Site\Model;
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+use Joomla\CMS\MVC\Model\BaseDatabaseModel;
+
+class VehiclesModel extends BaseDatabaseModel
+{
+    public function getVehicles()
+    {
+        $user = Factory::getApplication()->getIdentity();
+
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+
+            ->select('d.*')
+
+            ->from(
+                $db->quoteName(
+                    '#__gpsportal_devices',
+                    'd'
+                )
+            )
+
+            ->join(
+                'INNER',
+                $db->quoteName(
+                    '#__gpsportal_user_devices',
+                    'ud'
+                )
+                . ' ON ud.device_id = d.id'
+            )
+
+            ->where(
+                'ud.user_id = '
+                . (int) $user->id
+            )
+
+            ->order('d.name ASC');
+
+        $db->setQuery($query);
+
+        return $db->loadObjectList();
+    }
+
+    public function getVehicle(int $id)
+    {
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+            ->select('*')
+            ->from('#__gpsportal_devices')
+            ->where('id=' . (int) $id);
+
+        $db->setQuery($query);
+
+        return $db->loadObject();
+    }
+
+    public function saveVehicle(array $data)
+    {
+        $user = Factory::getApplication()->getIdentity();
+
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $vehicle = (object) [
+
+            'traccar_device_id' => (int) $data['traccar_device_id'],
+            'name'              => $data['name'],
+            'license_plate'     => $data['license_plate'],
+            'vehicle_type'      => $data['vehicle_type'],
+            'manufacturer'      => $data['manufacturer'],
+            'model'             => $data['model'],
+            'driver'            => $data['driver'],
+            'cost_center'       => $data['cost_center'],
+            'color'             => $data['color'],
+            'notes'             => $data['notes'],
+            'created'           => date('Y-m-d H:i:s')
+        ];
+
+        $db->insertObject(
+            '#__gpsportal_devices',
+            $vehicle,
+            'id'
+        );
+
+        $link = (object) [
+
+            'user_id'   => (int) $user->id,
+            'device_id' => (int) $vehicle->id,
+            'created'   => date('Y-m-d H:i:s')
+        ];
+
+        $db->insertObject(
+            '#__gpsportal_user_devices',
+            $link
+        );
+
+        return true;
+    }
+
+    public function updateVehicle(
+        int $id,
+        array $data
+    )
+    {
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $vehicle = (object) [
+
+            'id'                => $id,
+            'traccar_device_id' => (int) $data['traccar_device_id'],
+            'name'              => $data['name'],
+            'license_plate'     => $data['license_plate'],
+            'vehicle_type'      => $data['vehicle_type'],
+            'manufacturer'      => $data['manufacturer'],
+            'model'             => $data['model'],
+            'driver'            => $data['driver'],
+            'cost_center'       => $data['cost_center'],
+            'color'             => $data['color'],
+            'notes'             => $data['notes'],
+            'modified'          => date('Y-m-d H:i:s')
+        ];
+
+        $db->updateObject(
+            '#__gpsportal_devices',
+            $vehicle,
+            'id'
+        );
+
+        return true;
+    }
+
+    public function deleteVehicle(int $id)
+    {
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+            ->delete('#__gpsportal_user_devices')
+            ->where('device_id=' . (int) $id);
+
+        $db->setQuery($query);
+        $db->execute();
+
+        $query = $db->getQuery(true)
+            ->delete('#__gpsportal_devices')
+            ->where('id=' . (int) $id);
+
+        $db->setQuery($query);
+        $db->execute();
+
+        return true;
+    }
+}

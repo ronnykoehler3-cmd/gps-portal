@@ -1,0 +1,42 @@
+<?php
+
+namespace TKKundendienst\Component\Gpsportal\Site\View\Livemap;
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
+use TKKundendienst\Component\Gpsportal\Site\Model\TraccarModel;
+
+class HtmlView extends BaseHtmlView
+{
+    public $devices = [];
+    public $positions = [];
+    public $vehicleMeta = [];
+    public $traccarUserId = null;
+
+    public function display($tpl = null)
+    {
+        $model = new TraccarModel();
+
+        $this->traccarUserId =
+            $model->getCurrentTraccarUserId();
+
+        $this->devices =
+            $model->getDevices();
+
+        $this->positions =
+            $model->getPositions();
+
+        $this->vehicleMeta =
+            $model->getVehicleMeta();
+
+        ob_start();
+
+        parent::display($tpl);
+
+        $content = ob_get_clean();
+
+        require JPATH_SITE
+            . '/components/com_gpsportal/layouts/app.php';
+    }
+}

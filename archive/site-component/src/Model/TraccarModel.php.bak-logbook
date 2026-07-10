@@ -1,0 +1,256 @@
+<?php
+
+namespace TKKundendienst\Component\Gpsportal\Site\Model;
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+
+class TraccarModel
+{
+    private function request($endpoint)
+    {
+        $db = Factory::getContainer()->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+            ->select(['setting_key', 'setting_value'])
+            ->from('#__gpsportal_settings');
+
+        $db->setQuery($query);
+
+        $rows = $db->loadAssocList('setting_key', 'setting_value');
+
+        $ch = curl_init();
+
+        curl_setopt_array($ch, [
+            CURLOPT_URL => rtrim($rows['traccar_url'], '/') . $endpoint,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_USERPWD => $rows['traccar_user'] . ':' . $rows['traccar_password'],
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_TIMEOUT => 15
+        ]);
+
+        $response = curl_exec($ch);
+
+        curl_close($ch);
+
+        return json_decode($response, true);
+    }
+
+    private function isSuperUser(): bool
+    {
+        $user = Factory::getApplication()->getIdentity();
+
+        return in_array(8, $user->groups ?? []);
+    }
+
+    private function getAllowedTraccarDeviceIds()
+    {
+        $user = Factory::getApplication()->getIdentity();
+
+        if (!$user || !$user->id)
+        {
+            return [];
+        }
+
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+
+            ->select('d.traccar_device_id')
+
+            ->from(
+                '#__gpsportal_devices AS d'
+            )
+
+            ->join(
+                'INNER',
+                '#__gpsportal_user_devices AS ud
+                 ON ud.device_id = d.id'
+            )
+
+            ->where(
+                'ud.user_id = ' . (int) $user->id
+            );
+
+        $db->setQuery($query);
+
+        $result = $db->loadColumn();
+
+
+        return array_map(
+            'intval',
+            $result
+        );
+    }
+
+    public function getDevices()
+    {
+        $devices = $this->request('/api/devices');
+
+        if ($this->isSuperUser())
+        {
+            return $devices;
+        }
+
+        $allowedIds =
+            $this->getAllowedTraccarDeviceIds();
+
+        if (empty($allowedIds))
+        {
+            return [];
+        }
+
+        return array_values(
+            array_filter(
+                $devices,
+                function ($device) use ($allowedIds)
+                {
+                    return in_array(
+                        (int) $device['id'],
+                        $allowedIds,
+                        true
+                    );
+                }
+            )
+        );
+    }
+
+    public function getPositions()
+    {
+        $positions = $this->request('/api/positions');
+file_put_contents(
+    '/tmp/traccar_positions.log',
+    print_r($positions, true)
+);
+        if ($this->isSuperUser())
+        {
+            return $positions;
+        }
+
+        $allowedIds =
+            $this->getAllowedTraccarDeviceIds();
+
+        if (empty($allowedIds))
+        {
+            return [];
+        }
+
+        return array_values(
+            array_filter(
+                $positions,
+                function ($position) use ($allowedIds)
+                {
+                    return in_array(
+                        (int) $position['deviceId'],
+                        $allowedIds,
+                        true
+                    );
+                }
+            )
+        );
+    }
+public function getVehicleMeta()
+{
+    $db = Factory::getContainer()
+        ->get('DatabaseDriver');
+
+    $query = $db->getQuery(true)
+
+        ->select([
+            'traccar_device_id',
+            'vehicle_type',
+            'marker_icon',
+            'color',
+            'license_plate',
+            'driver'
+        ])
+
+        ->from('#__gpsportal_devices');
+
+    $db->setQuery($query);
+
+    $rows = $db->loadAssocList();
+
+    $result = [];
+
+    foreach ($rows as $row)
+    {
+        $result[
+            (int)$row['traccar_device_id']
+        ] = $row;
+    }
+
+    return $result;
+}
+    public function getHistory(
+        int $deviceId,
+        string $from,
+        string $to
+    ): array
+    {
+        $positions = $this->request(
+            '/api/positions?'
+            . http_build_query([
+                'deviceId' => $deviceId,
+                'from'     => $from,
+                'to'       => $to
+            ])
+        );
+
+        if (!is_array($positions))
+        {
+            return [];
+        }
+
+        if ($this->isSuperUser())
+        {
+            return $positions;
+        }
+
+        $allowedIds =
+            $this->getAllowedTraccarDeviceIds();
+
+        if (
+            !in_array(
+                $deviceId,
+                $allowedIds,
+                true
+            )
+        ) {
+            return [];
+        }
+
+        return $positions;
+    }   
+ public function getCurrentTraccarUserId()
+    {
+        $user = Factory::getApplication()->getIdentity();
+
+        if (!$user || !$user->id)
+        {
+            return null;
+        }
+
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+
+            ->select('traccar_user_id')
+
+            ->from(
+                '#__gpsportal_traccar_users'
+            )
+
+            ->where(
+                'joomla_user_id = '
+                . (int) $user->id
+            );
+
+        $db->setQuery($query);
+
+        return (int) $db->loadResult();
+    }
+}

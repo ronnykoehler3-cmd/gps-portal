@@ -1,0 +1,174 @@
+<?php
+defined('_JEXEC') or die;
+use Joomla\CMS\Factory;
+use Joomla\CMS\HTML\HTMLHelper;
+use Joomla\CMS\Router\Route;
+
+$user = Factory::getApplication()->getIdentity();
+$totalDevices = count($this->devices);
+$onlineDevices = 0;
+
+$positionsByDevice = [];
+
+foreach ($this->positions as $position)
+{
+    $positionsByDevice[$position['deviceId']] = $position;
+}
+
+foreach ($this->devices as $device)
+{
+    if (
+        isset($device['status']) &&
+        $device['status'] === 'online'
+    ) {
+        $onlineDevices++;
+    }
+}
+?>
+
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<div class="dashboard-header">
+
+    <div>
+        <h1>GPS Portal Dashboard</h1>
+        <p>
+            Willkommen
+            <strong><?php echo htmlspecialchars($user->name); ?></strong>
+        </p>
+    </div>
+
+    <div>
+
+        <form
+            action="<?php echo Route::_('index.php?option=com_users&task=user.logout'); ?>"
+            method="post"
+        >
+
+            <button
+                type="submit"
+                class="logout-btn"
+            >
+                Logout
+            </button>
+
+            <?php echo HTMLHelper::_('form.token'); ?>
+
+        </form>
+
+    </div>
+
+</div>
+<div class="cards">
+
+    <div class="card">
+        <h3>Fahrzeuge gesamt</h3>
+        <h1><?php echo $totalDevices; ?></h1>
+    </div>
+
+    <div class="card">
+        <h3>Fahrzeuge online</h3>
+        <h1><?php echo $onlineDevices; ?></h1>
+    </div>
+
+    <div class="card">
+<h3>Offline</h3>
+        <h1><?php echo count($this->positions); ?></h1>
+    </div>
+
+    <div class="card">
+<h3>Ø Batterie</h3>
+        <h1><?php echo $totalDevices; ?></h1>
+    </div>
+</div>
+
+<div class="vehicle-table">
+
+    <h2>Fahrzeuge</h2>
+
+    <table>
+
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Batterie</th>
+                <th>Geschwindigkeit</th>
+                <th>Letzte Meldung</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+        <?php foreach ($this->devices as $device): ?>
+
+            <?php
+
+            $position =
+                $positionsByDevice[$device['id']]
+                ?? [];
+
+            $battery =
+                $position['attributes']['batteryLevel']
+                ?? '-';
+
+            $speed =
+                round(
+                    (($position['speed'] ?? 0) * 1.852),
+                    1
+                );
+
+$lastUpdate = '-';
+
+if (!empty($device['lastUpdate']))
+{
+    $date = new DateTime(
+        $device['lastUpdate'],
+        new DateTimeZone('UTC')
+    );
+
+    $date->setTimezone(
+        new DateTimeZone('Europe/Berlin')
+    );
+
+    $lastUpdate = $date->format(
+        'd.m.Y H:i:s'
+    );
+}
+            ?>
+
+            <tr>
+
+                <td>
+                    <?php echo htmlspecialchars($device['name']); ?>
+                </td>
+
+                <td>
+                    <?php echo htmlspecialchars($device['status']); ?>
+                </td>
+
+                <td>
+                    <?php echo $battery; ?> %
+                </td>
+
+                <td>
+                    <?php echo $speed; ?> km/h
+                </td>
+
+                <td>
+                    <?php echo $lastUpdate; ?>
+                </td>
+
+            </tr>
+
+        <?php endforeach; ?>
+
+        </tbody>
+
+    </table>
+
+</div>
+
+<script>

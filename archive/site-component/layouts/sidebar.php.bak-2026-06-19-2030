@@ -1,0 +1,51 @@
+<?php
+defined('_JEXEC') or die;
+?>
+
+<aside class="gps-sidebar">
+
+    <div class="gps-logo">
+        GPS Portal
+    </div>
+
+    <nav>
+
+        <a href="index.php?option=com_gpsportal&view=dashboard">
+            Dashboard
+        </a>
+
+        <a href="index.php?option=com_gpsportal&view=livemap">
+            Live-Karte
+        </a>
+
+        <a href="index.php?option=com_gpsportal&view=vehicles">
+            Fahrzeuge
+        </a>
+
+        <a href="index.php?option=com_gpsportal&view=history">
+            Historie
+        </a>
+
+        <a href="index.php?option=com_gpsportal&view=logbook">
+            Fahrtenbuch
+        </a>
+
+        <a href="index.php?option=com_gpsportal&view=reports">
+            Berichte
+        </a>
+
+        <a href="index.php?option=com_gpsportal&view=geofences">
+            Geozonen
+        </a>
+
+        <a href="index.php?option=com_gpsportal&view=documents">
+            Dokumente
+        </a>
+
+        <a href="index.php?option=com_gpsportal&view=settings">
+            Einstellungen
+        </a>
+
+    </nav>
+
+</aside>

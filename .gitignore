@@ -27,3 +27,71 @@ target/
 .env
 .env.local
 
+# ============================================================
+# GPS Portal
+# ============================================================
+
+# Produktive Joomla-Konfiguration
+/public/configuration.php
+/public/configuration.local.php
+/public/configuration.dev.php
+
+# Laufzeitdaten
+/storage/*
+!/storage/.gitkeep
+!/storage/README.md
+
+# Joomla Cache, Logs und temporäre Dateien
+/public/cache/*
+/public/tmp/*
+/public/logs/*
+/public/administrator/logs/*
+/public/administrator/cache/*
+
+# Akeeba Backup
+/public/administrator/components/com_akeebabackup/backup/*
+*.jpa
+*.jps
+*.j01
+*.j02
+*.j03
+
+# Datenbank-Dumps
+*.sql
+*.sql.gz
+*.dump
+
+# Zertifikate und Schlüssel
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Logs und Archive
+*.log
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.rar
+
+# Temporäre Dateien
+*.bak
+*.old
+*.orig
+*.tmp
+*.temp
+# Composer Lock nur ignorieren, wenn bewusst nicht versioniert
+# composer.lock
+
+# Lokale IDEs
+.idea/
+
+# GitHub Copilot / VS Code lokale Arbeitsdateien
+.history/
+
+# PHPUnit
+.phpunit.result.cache
+
+# Betriebssystem
+ehthumbs.db

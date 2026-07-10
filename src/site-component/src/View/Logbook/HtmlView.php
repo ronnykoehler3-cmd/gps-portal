@@ -1,0 +1,357 @@
+<?php
+
+namespace TKKundendienst\Component\Gpsportal\Site\View\Logbook;
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
+use TKKundendienst\Component\Gpsportal\Site\Model\VehiclesModel;
+use TKKundendienst\Component\Gpsportal\Site\Model\TraccarModel;
+use TKKundendienst\Component\Gpsportal\Site\Model\LogbookModel;
+
+class HtmlView extends BaseHtmlView
+{
+    public $vehicles = [];
+    public $history = [];
+    public $trips = [];
+    public $vehicleId = 0;
+    public $from = '';
+    public $to = '';
+
+    public function display($tpl = null)
+    {
+$vehiclesModel = new VehiclesModel();
+$traccarModel  = new TraccarModel();
+$logbookModel  = new LogbookModel();
+        $this->vehicles =
+            $vehiclesModel->getVehicles();
+
+        $app = Factory::getApplication();
+
+        $this->vehicleId =
+            (int) $app->input->getInt('vehicle');
+
+        $this->from =
+            $app->input->getString('from');
+
+        $this->to =
+            $app->input->getString('to');
+
+        if (
+            $this->vehicleId > 0
+            && !empty($this->from)
+            && !empty($this->to)
+        )
+        {
+            $this->history =
+                $traccarModel->getHistory(
+                    $this->vehicleId,
+                    date('c', strtotime($this->from)),
+                    date('c', strtotime($this->to))
+                );
+
+            $tripStart = null;
+            $lastMovingPosition = null;
+            $stopStart = null;
+
+            foreach ($this->history as $pos)
+            {
+                $speed =
+                    (float) ($pos['speed'] ?? 0);
+
+                if ($speed > 5)
+                {
+                    if ($tripStart === null)
+                    {
+                        $tripStart = $pos;
+                    }
+
+                    $lastMovingPosition = $pos;
+                    $stopStart = null;
+
+                    continue;
+                }
+
+                if ($tripStart === null)
+                {
+                    continue;
+                }
+
+                if ($stopStart === null)
+                {
+                    $stopStart = $pos;
+                    continue;
+                }
+
+                $stopMinutes =
+                    (
+                        strtotime($pos['fixTime'])
+                        -
+                        strtotime($stopStart['fixTime'])
+                    ) / 60;
+
+                if ($stopMinutes < 60)
+                {
+                    continue;
+                }
+
+                $tripEnd = $lastMovingPosition;
+
+                if (!$tripEnd)
+                {
+                    continue;
+                }
+
+                $startKm =
+                    (float)(
+                        $tripStart['attributes']['totalDistance']
+                        ?? 0
+                    );
+
+                $endKm =
+                    (float)(
+                        $tripEnd['attributes']['totalDistance']
+                        ?? 0
+                    );
+
+                $distanceKm =
+                    round(
+                        ($endKm - $startKm) / 1000,
+                        1
+                    );
+
+                if ($distanceKm >= 1)
+                {
+                    $startTime =
+                        new \DateTime(
+                            $tripStart['fixTime']
+                        );
+
+                    $startTime->setTimezone(
+                        new \DateTimeZone(
+                            'Europe/Berlin'
+                        )
+                    );
+
+                    $endTime =
+                        new \DateTime(
+                            $tripEnd['fixTime']
+                        );
+
+                    $endTime->setTimezone(
+                        new \DateTimeZone(
+                            'Europe/Berlin'
+                        )
+                    );
+
+$durationMinutes =
+    round(
+        (
+            strtotime($tripEnd['fixTime'])
+            -
+            strtotime($tripStart['fixTime'])
+        ) / 60
+    );
+
+$tripKey =
+    md5(
+        $this->vehicleId
+        . $tripStart['fixTime']
+        . $tripEnd['fixTime']
+    );
+
+$savedTrip =
+    $logbookModel->getTripData(
+        $tripKey
+    );
+
+$this->trips[] = [
+
+'trip_key' =>
+    $tripKey,
+
+'trip_type' =>
+    $savedTrip->trip_type ?? 'Geschäftlich',
+
+'trip_reason' =>
+    $savedTrip->trip_reason ?? '',
+'signature_place' =>
+    $savedTrip->signature_place ?? '',
+
+'signature_date' =>
+    $savedTrip->signature_date ?? date('Y-m-d'),
+
+'signature_driver' =>
+    $savedTrip->signature_driver ?? '',
+'start_lat' =>
+    (float)($tripStart['latitude'] ?? 0),
+
+'start_lon' =>
+    (float)($tripStart['longitude'] ?? 0),
+
+'end_lat' =>
+    (float)($tripEnd['latitude'] ?? 0),
+
+'end_lon' =>
+    (float)($tripEnd['longitude'] ?? 0),
+                        'start' =>
+                            $startTime->format(
+                                'Y-m-d H:i:s'
+                            ),
+
+                        'end' =>
+                            $endTime->format(
+                                'Y-m-d H:i:s'
+                            ),
+'start_km' =>
+    round($startKm / 1000, 1),
+
+'end_km' =>
+    round($endKm / 1000, 1),
+
+'distance' =>
+    $distanceKm,
+
+'duration' =>
+    $durationMinutes
+                    ];
+                }
+
+                $tripStart = null;
+                $lastMovingPosition = null;
+                $stopStart = null;
+            }
+
+            if (
+                $tripStart !== null
+                &&
+                $lastMovingPosition !== null
+            )
+            {
+                $startKm =
+                    (float)(
+                        $tripStart['attributes']['totalDistance']
+                        ?? 0
+                    );
+
+                $endKm =
+                    (float)(
+                        $lastMovingPosition['attributes']['totalDistance']
+                        ?? 0
+                    );
+
+                $distanceKm =
+                    round(
+                        ($endKm - $startKm) / 1000,
+                        1
+                    );
+
+                if ($distanceKm >= 1)
+                {
+                    $startTime =
+                        new \DateTime(
+                            $tripStart['fixTime']
+                        );
+
+                    $startTime->setTimezone(
+                        new \DateTimeZone(
+                            'Europe/Berlin'
+                        )
+                    );
+
+                    $endTime =
+                        new \DateTime(
+                            $lastMovingPosition['fixTime']
+                        );
+
+                    $endTime->setTimezone(
+                        new \DateTimeZone(
+                            'Europe/Berlin'
+                        )
+                    );
+$durationMinutes =
+    round(
+        (
+            strtotime($lastMovingPosition['fixTime'])
+            -
+            strtotime($tripStart['fixTime'])
+        ) / 60
+    );
+$tripKey =
+    md5(
+        $this->vehicleId
+        . $tripStart['fixTime']
+        . $lastMovingPosition['fixTime']
+    );
+
+$savedTrip =
+    $logbookModel->getTripData(
+        $tripKey
+    );
+
+$this->trips[] = [
+
+'trip_key' =>
+    $tripKey,
+
+'trip_type' =>
+    $savedTrip->trip_type ?? 'Geschäftlich',
+
+'trip_reason' =>
+    $savedTrip->trip_reason ?? '',
+'signature_place' =>
+    $savedTrip->signature_place ?? '',
+
+'signature_date' =>
+    $savedTrip->signature_date ?? date('Y-m-d'),
+
+'signature_driver' =>
+    $savedTrip->signature_driver ?? '',
+'start_lat' =>
+    (float)($tripStart['latitude'] ?? 0),
+
+'start_lon' =>
+    (float)($tripStart['longitude'] ?? 0),
+
+'end_lat' =>
+    (float)($lastMovingPosition['latitude'] ?? 0),
+
+'end_lon' =>
+    (float)($lastMovingPosition['longitude'] ?? 0),
+                        'start' =>
+                            $startTime->format(
+                                'Y-m-d H:i:s'
+                            ),
+
+'end' =>
+    $endTime->format(
+        'Y-m-d H:i:s'
+    ),
+
+'start_km' =>
+    round($startKm / 1000, 1),
+
+'end_km' =>
+    round($endKm / 1000, 1),
+
+'distance' =>
+    $distanceKm,
+
+'duration' =>
+    $durationMinutes
+                    ];
+                }
+            }
+        }
+
+        ob_start();
+
+        parent::display($tpl);
+
+        $content = ob_get_clean();
+
+        require JPATH_SITE
+            . '/components/com_gpsportal/layouts/app.php';
+    }
+}

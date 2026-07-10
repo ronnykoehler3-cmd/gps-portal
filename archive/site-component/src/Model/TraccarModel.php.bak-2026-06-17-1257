@@ -1,0 +1,49 @@
+<?php
+
+namespace TKKundendienst\Component\Gpsportal\Site\Model;
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+
+class TraccarModel
+{
+    private function request($endpoint)
+    {
+        $db = Factory::getContainer()->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+            ->select(['setting_key','setting_value'])
+            ->from('#__gpsportal_settings');
+
+        $db->setQuery($query);
+
+        $rows = $db->loadAssocList('setting_key','setting_value');
+
+        $ch = curl_init();
+
+        curl_setopt_array($ch, [
+            CURLOPT_URL => rtrim($rows['traccar_url'],'/') . $endpoint,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_USERPWD => $rows['traccar_user'] . ':' . $rows['traccar_password'],
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_TIMEOUT => 15
+        ]);
+
+        $response = curl_exec($ch);
+
+        curl_close($ch);
+
+        return json_decode($response, true);
+    }
+
+    public function getDevices()
+    {
+        return $this->request('/api/devices');
+    }
+
+    public function getPositions()
+    {
+        return $this->request('/api/positions');
+    }
+}

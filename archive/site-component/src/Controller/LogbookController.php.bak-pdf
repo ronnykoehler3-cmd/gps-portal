@@ -1,0 +1,121 @@
+<?php
+
+namespace TKKundendienst\Component\Gpsportal\Site\Controller;
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+use Joomla\CMS\MVC\Controller\BaseController;
+
+class LogbookController extends BaseController
+{
+    public function save()
+    {
+        $app = Factory::getApplication();
+
+        $tripTypes =
+            $app->input->post->get(
+                'trip_type',
+                [],
+                'array'
+            );
+
+        $tripReasons =
+            $app->input->post->get(
+                'trip_reason',
+                [],
+                'array'
+            );
+
+        $vehicleId =
+            (int) $app->input->post->getInt(
+                'vehicle'
+            );
+
+        $user =
+            $app->getIdentity();
+
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        foreach ($tripTypes as $tripKey => $tripType)
+        {
+            $tripReason =
+                $tripReasons[$tripKey]
+                ?? '';
+
+            $query = $db->getQuery(true)
+                ->select('id')
+                ->from('#__gpsportal_logbook')
+                ->where(
+                    'trip_key = '
+                    . $db->quote($tripKey)
+                );
+
+            $db->setQuery($query);
+
+            $existingId =
+                (int) $db->loadResult();
+
+            if ($existingId)
+            {
+                $entry = (object) [
+
+                    'id' =>
+                        $existingId,
+
+                    'trip_type' =>
+                        $tripType,
+
+                    'trip_reason' =>
+                        $tripReason
+                ];
+
+                $db->updateObject(
+                    '#__gpsportal_logbook',
+                    $entry,
+                    'id'
+                );
+
+                continue;
+            }
+
+            $entry = (object) [
+
+                'user_id' =>
+                    (int) $user->id,
+
+                'vehicle_id' =>
+                    $vehicleId,
+
+                'trip_key' =>
+                    $tripKey,
+
+                'trip_type' =>
+                    $tripType,
+
+                'trip_reason' =>
+                    $tripReason,
+
+                'trip_start' =>
+                    date('Y-m-d H:i:s'),
+
+                'trip_end' =>
+                    date('Y-m-d H:i:s')
+            ];
+
+            $db->insertObject(
+                '#__gpsportal_logbook',
+                $entry
+            );
+        }
+
+        $app->enqueueMessage(
+            'Fahrtenbuch gespeichert.'
+        );
+
+        $app->redirect(
+            $_SERVER['HTTP_REFERER']
+        );
+    }
+}

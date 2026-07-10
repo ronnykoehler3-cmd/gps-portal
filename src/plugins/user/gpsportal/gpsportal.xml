@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="plugin" group="user" method="upgrade">
+
+    <name>plg_user_gpsportal</name>
+
+    <author>TK Kundendienst</author>
+
+    <version>1.0.0</version>
+
+    <description>
+        GPS Portal Benutzer Synchronisation
+    </description>
+
+    <namespace path="src">TKKundendienst\Plugin\User\Gpsportal</namespace>
+    
+<files>
+        <folder plugin="gpsportal">services</folder>
+        <folder>src</folder>
+    </files>
+
+</extension>

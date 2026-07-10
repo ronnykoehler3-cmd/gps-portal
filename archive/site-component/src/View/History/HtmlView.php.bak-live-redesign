@@ -1,0 +1,59 @@
+<?php
+
+namespace TKKundendienst\Component\Gpsportal\Site\View\History;
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
+use TKKundendienst\Component\Gpsportal\Site\Model\VehiclesModel;
+use TKKundendienst\Component\Gpsportal\Site\Model\TraccarModel;
+
+class HtmlView extends BaseHtmlView
+{
+    public $vehicles = [];
+    public $history = [];
+
+    public function display($tpl = null)
+    {
+        $vehiclesModel = new VehiclesModel();
+        $traccarModel  = new TraccarModel();
+
+        $this->vehicles =
+            $vehiclesModel->getVehicles();
+
+        $app = Factory::getApplication();
+
+        $vehicleId =
+            (int) $app->input->getInt('vehicle');
+
+        $from =
+            $app->input->getString('from');
+
+        $to =
+            $app->input->getString('to');
+
+        if (
+            $vehicleId > 0
+            && !empty($from)
+            && !empty($to)
+        )
+        {
+            $this->history =
+                $traccarModel->getHistory(
+                    $vehicleId,
+                    date('c', strtotime($from)),
+                    date('c', strtotime($to))
+                );
+        }
+
+        ob_start();
+
+        parent::display($tpl);
+
+        $content = ob_get_clean();
+
+        require JPATH_SITE
+            . '/components/com_gpsportal/layouts/app.php';
+    }
+}

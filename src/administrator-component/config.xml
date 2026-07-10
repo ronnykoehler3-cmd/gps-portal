@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<form>
+
+    <fieldset
+        name="traccar"
+        label="Traccar">
+
+        <field
+            name="traccar_url"
+            type="url"
+            label="Traccar URL"
+            default="https://traccar.tk-kundendienst.de" />
+
+        <field
+            name="traccar_user"
+            type="text"
+            label="API Benutzer" />
+
+        <field
+            name="traccar_password"
+            type="password"
+            label="API Passwort" />
+
+    </fieldset>
+
+    <fieldset
+        name="maps"
+        label="Karten">
+
+        <field
+            name="default_map"
+            type="list"
+            label="Standardkarte"
+            default="traccar">
+
+            <option value="traccar">Traccar Standard</option>
+            <option value="osm">OpenStreetMap</option>
+            <option value="dark">Dark Map</option>
+            <option value="satellite">Satellit</option>
+            <option value="apple_style">Apple Style</option>
+
+        </field>
+
+    </fieldset>
+
+    <fieldset
+        name="theme"
+        label="Design">
+
+        <field
+            name="default_theme"
+            type="list"
+            label="Standard Design"
+            default="auto">
+
+            <option value="light">Hell</option>
+            <option value="dark">Dunkel</option>
+            <option value="auto">Automatisch</option>
+
+        </field>
+
+    </fieldset>
+
+</form>
