@@ -1,0 +1,97 @@
+<?php
+
+defined('_JEXEC') or die;
+
+?>
+
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<style>
+
+body{
+    margin:0;
+    font-family:Segoe UI,Arial,sans-serif;
+    background:#f4f7fb;
+}
+
+.gps-layout{
+    display:flex;
+    min-height:100vh;
+}
+
+.gps-sidebar{
+    width:260px;
+    background:#1e293b;
+    color:#fff;
+}
+
+.gps-logo{
+    padding:25px;
+    font-size:22px;
+    font-weight:bold;
+    border-bottom:1px solid rgba(255,255,255,.1);
+}
+
+.gps-sidebar nav a{
+    display:block;
+    color:#fff;
+    text-decoration:none;
+    padding:15px 25px;
+}
+
+.gps-sidebar nav a:hover{
+    background:#334155;
+}
+
+.gps-main{
+    flex:1;
+}
+
+.gps-header{
+    background:#fff;
+    padding:20px 30px;
+    box-shadow:0 2px 10px rgba(0,0,0,.05);
+    display:flex;
+    justify-content:space-between;
+}
+
+.gps-content{
+    padding:30px;
+}
+
+.card{
+    background:#fff;
+    border-radius:12px;
+    padding:20px;
+    box-shadow:0 2px 8px rgba(0,0,0,.05);
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="gps-layout">
+
+    <?php require __DIR__ . '/sidebar.php'; ?>
+
+    <div class="gps-main">
+
+        <?php require __DIR__ . '/header.php'; ?>
+
+        <div class="gps-content">
+
+            <?php echo $content; ?>
+
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

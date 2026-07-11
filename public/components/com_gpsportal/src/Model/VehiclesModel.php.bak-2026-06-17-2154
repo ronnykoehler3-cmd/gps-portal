@@ -1,0 +1,21 @@
+<?php
+
+namespace TKKundendienst\Component\Gpsportal\Site\Model;
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+use Joomla\CMS\MVC\Model\BaseDatabaseModel;
+
+class VehiclesModel extends BaseDatabaseModel
+{
+    private function getTraccarSettings()
+    {
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+            ->select(['setting_key','setting_value'])
+            ->from('#__gpsportal_settings');
+
+        $db->

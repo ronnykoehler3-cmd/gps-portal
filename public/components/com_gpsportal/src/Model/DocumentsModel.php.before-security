@@ -1,0 +1,245 @@
+<?php
+
+namespace TKKundendienst\Component\Gpsportal\Site\Model;
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+use Joomla\CMS\MVC\Model\BaseDatabaseModel;
+
+class DocumentsModel extends BaseDatabaseModel
+{
+    public function getVehicles()
+    {
+        $user = Factory::getApplication()->getIdentity();
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+
+            ->select('d.*')
+
+            ->from(
+                $db->quoteName(
+                    '#__gpsportal_devices',
+                    'd'
+                )
+            )
+
+            ->join(
+                'INNER',
+                $db->quoteName(
+                    '#__gpsportal_user_devices',
+                    'ud'
+                )
+                . ' ON ud.device_id = d.id'
+            )
+
+            ->where(
+                'ud.user_id = '
+                . (int) $user->id
+            )
+
+            ->order('d.name ASC');
+
+        $db->setQuery($query);
+
+        return $db->loadObjectList();
+    }
+
+    public function getDocuments(int $vehicleId)
+    {
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+
+            ->select('*')
+
+            ->from(
+                '#__gpsportal_vehicle_documents'
+            )
+
+            ->where(
+                'vehicle_id=' . (int) $vehicleId
+            )
+
+            ->order(
+                'created DESC'
+            );
+
+        $db->setQuery($query);
+
+        return $db->loadObjectList();
+    }
+public function saveDocument(
+    array $file,
+    array $data
+)
+{
+    $user = Factory::getApplication()->getIdentity();
+
+    $storagePath =
+        '/var/www/gps/storage/vehicles/';
+
+    $extension =
+        strtolower(
+            pathinfo(
+                $file['name'],
+                PATHINFO_EXTENSION
+            )
+        );
+
+    $filename =
+        uniqid('doc_')
+        . '.'
+        . $extension;
+
+if (
+    !move_uploaded_file(
+        $file['tmp_name'],
+        $storagePath . $filename
+    )
+)
+{
+    return false;
+}
+    $db = Factory::getContainer()
+        ->get('DatabaseDriver');
+
+    $document = (object) [
+
+        'vehicle_id'
+            => (int) $data['vehicle_id'],
+
+        'user_id'
+            => (int) $user->id,
+
+        'filename'
+            => $filename,
+
+        'original_name'
+            => $file['name'],
+
+        'file_size'
+            => (int) $file['size'],
+
+        'document_type'
+            => $data['document_type'],
+
+'valid_until'
+    => !empty($data['valid_until'])
+        ? $data['valid_until']
+        : null,
+
+        'reminder_days'
+            => (int) $data['reminder_days'],
+
+        'notes'
+            => $data['notes'],
+
+        'created'
+            => date('Y-m-d H:i:s')
+    ];
+
+    $db->insertObject(
+        '#__gpsportal_vehicle_documents',
+        $document
+    );
+
+    return true;
+}
+public function getDocument(int $id)
+{
+    $db = Factory::getContainer()
+        ->get('DatabaseDriver');
+
+    $query = $db->getQuery(true)
+
+        ->select('*')
+
+        ->from(
+            '#__gpsportal_vehicle_documents'
+        )
+
+        ->where(
+            'id=' . (int) $id
+        );
+
+    $db->setQuery($query);
+
+    return $db->loadObject();
+}
+
+public function downloadDocument(int $id)
+{
+    $document = $this->getDocument($id);
+
+    if (!$document)
+    {
+        return false;
+    }
+
+    $file =
+        '/var/www/gps/storage/vehicles/'
+        . $document->filename;
+
+    if (!file_exists($file))
+    {
+        return false;
+    }
+
+    while (ob_get_level())
+    {
+        ob_end_clean();
+    }
+
+    header('Content-Description: File Transfer');
+    header('Content-Type: application/octet-stream');
+    header(
+        'Content-Disposition: attachment; filename="'
+        . basename($document->original_name)
+        . '"'
+    );
+    header('Content-Length: ' . filesize($file));
+
+    readfile($file);
+
+    exit;
+}
+public function deleteDocument(int $id)
+{
+    $document = $this->getDocument($id);
+
+    if ($document)
+    {
+        $file =
+            '/var/www/gps/storage/vehicles/'
+            . $document->filename;
+
+        if (file_exists($file))
+        {
+            unlink($file);
+        }
+    }
+
+    $db = Factory::getContainer()
+        ->get('DatabaseDriver');
+
+    $query = $db->getQuery(true)
+
+        ->delete(
+            '#__gpsportal_vehicle_documents'
+        )
+
+        ->where(
+            'id=' . (int) $id
+        );
+
+    $db->setQuery($query);
+
+    $db->execute();
+
+    return true;
+}
+}

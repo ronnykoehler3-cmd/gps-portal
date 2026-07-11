@@ -1,0 +1,6 @@
+[Unit]
+Description=TK GPS Firewall Rücksetzung
+
+[Service]
+Type=oneshot
+ExecStart=/var/lib/tk-gps-firewall/rollback.sh

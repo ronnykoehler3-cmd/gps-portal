@@ -1,0 +1,11 @@
+[Unit]
+Description=Tägliches GPS-Server-Backup und Neustart um 02:30 Uhr
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+AccuracySec=1min
+Unit=tk-nightly-reboot.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,397 @@
+<?php
+defined('_JEXEC') or die;
+
+$totalDevices = count($this->devices);
+$onlineDevices = 0;
+
+$positionsByDevice = [];
+
+foreach ($this->positions as $position)
+{
+    $positionsByDevice[$position['deviceId']] = $position;
+}
+
+foreach ($this->devices as $device)
+{
+    if (
+        isset($device['status']) &&
+        $device['status'] === 'online'
+    ) {
+        $onlineDevices++;
+    }
+}
+?>
+
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<div class="cards">
+
+    <div class="card">
+        <h3>Fahrzeuge gesamt</h3>
+        <h1><?php echo $totalDevices; ?></h1>
+    </div>
+
+    <div class="card">
+        <h3>Fahrzeuge online</h3>
+        <h1><?php echo $onlineDevices; ?></h1>
+    </div>
+
+    <div class="card">
+        <h3>Positionen</h3>
+        <h1><?php echo count($this->positions); ?></h1>
+    </div>
+
+    <div class="card">
+        <h3>Aktive Geräte</h3>
+        <h1><?php echo $totalDevices; ?></h1>
+    </div>
+
+</div>
+
+<div class="content-grid">
+
+    <div class="map-box">
+
+        <h2>Live-Karte</h2>
+
+        <div id="map"></div>
+
+    </div>
+
+    <div class="activity-box">
+
+<h2>Geräte</h2>
+
+<div id="live-devices"></div>
+
+    </div>
+
+</div>
+
+<div class="vehicle-table">
+
+    <h2>Fahrzeuge</h2>
+
+    <table>
+
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Batterie</th>
+                <th>Geschwindigkeit</th>
+                <th>Letzte Meldung</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+        <?php foreach ($this->devices as $device): ?>
+
+            <?php
+
+            $position =
+                $positionsByDevice[$device['id']]
+                ?? [];
+
+            $battery =
+                $position['attributes']['batteryLevel']
+                ?? '-';
+
+            $speed =
+                round(
+                    (($position['speed'] ?? 0) * 1.852),
+                    1
+                );
+
+$lastUpdate = '-';
+
+if (!empty($device['lastUpdate']))
+{
+    $date = new DateTime(
+        $device['lastUpdate'],
+        new DateTimeZone('UTC')
+    );
+
+    $date->setTimezone(
+        new DateTimeZone('Europe/Berlin')
+    );
+
+    $lastUpdate = $date->format(
+        'd.m.Y H:i:s'
+    );
+}
+            ?>
+
+            <tr>
+
+                <td>
+                    <?php echo htmlspecialchars($device['name']); ?>
+                </td>
+
+                <td>
+                    <?php echo htmlspecialchars($device['status']); ?>
+                </td>
+
+                <td>
+                    <?php echo $battery; ?> %
+                </td>
+
+                <td>
+                    <?php echo $speed; ?> km/h
+                </td>
+
+                <td>
+                    <?php echo $lastUpdate; ?>
+                </td>
+
+            </tr>
+
+        <?php endforeach; ?>
+
+        </tbody>
+
+    </table>
+
+</div>
+
+<script>
+var firstPosition =
+<?php echo json_encode($this->positions[0] ?? null); ?>;
+
+var map = L.map('map').setView(
+[
+    firstPosition.latitude,
+    firstPosition.longitude
+],
+15
+);
+
+L.tileLayer(
+'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+{
+    maxZoom: 19
+}
+).addTo(map);
+
+var markers = {};
+
+<?php foreach ($this->positions as $position): ?>
+
+markers[<?php echo $position['deviceId']; ?>] =
+L.marker(
+[
+    <?php echo $position['latitude']; ?>,
+    <?php echo $position['longitude']; ?>
+]
+)
+.addTo(map);
+
+<?php endforeach; ?>
+
+function translateActivity(activity)
+{
+    switch(activity)
+    {
+        case 'still': return 'Steht';
+        case 'walking': return 'Läuft';
+        case 'running': return 'Rennt';
+        case 'driving': return 'Fährt';
+        case 'cycling': return 'Fahrrad';
+        case 'moving': return 'In Bewegung';
+        default: return activity;
+    }
+}
+
+function getStatus(device)
+{
+    if(!device.lastUpdate)
+    {
+        return {
+            text: '🟠 Unbekannt',
+            className: 'status-unknown'
+        };
+    }
+
+    var last =
+        new Date(device.lastUpdate).getTime();
+
+    var now =
+        new Date().getTime();
+
+    var diff =
+        (now - last) / 1000;
+
+    if(diff < 600)
+    {
+        return {
+            text: '🟢 Online',
+            className: 'status-online'
+        };
+    }
+
+    if(diff < 86400)
+    {
+        return {
+            text: '🟠 Unbekannt',
+            className: 'status-unknown'
+        };
+    }
+
+    return {
+        text: '🔴 Offline',
+        className: 'status-offline'
+    };
+}
+function updateMap()
+{
+    fetch('/?option=com_gpsportal&view=api')
+    .then(response => response.json())
+    .then(data => {
+
+        var onlineCount = 0;
+        var offlineCount = 0;
+        var batteryTotal = 0;
+        var batteryDevices = 0;
+
+        var devicesHtml = '';
+        var tableHtml = '';
+
+        data.devices.forEach(function(device){
+
+            var position = null;
+
+            data.positions.forEach(function(pos){
+
+                if(pos.deviceId == device.id)
+                {
+                    position = pos;
+                }
+
+            });
+
+            var battery = '-';
+            var activity = '-';
+            var speed = 0;
+
+            if(position)
+            {
+                battery =
+                    position.attributes?.batteryLevel ?? '-';
+
+                activity =
+                    position.attributes?.activity ?? '-';
+
+                speed =
+                    ((position.speed ?? 0) * 1.852)
+                    .toFixed(1);
+
+                if(!isNaN(battery))
+                {
+                    batteryTotal += parseInt(battery);
+                    batteryDevices++;
+                }
+            }
+
+            activity =
+                translateActivity(activity);
+
+            var status =
+                getStatus(device);
+
+            if(status.className === 'status-online')
+            {
+                onlineCount++;
+            }
+            else
+            {
+                offlineCount++;
+            }
+
+            devicesHtml += `
+                <div class="activity-item">
+                    <strong>${device.name}</strong><br>
+                    Batterie: ${battery}%<br>
+                    Status: ${status.text}<br>
+                    Aktivität: ${activity}
+                </div>
+            `;
+
+            tableHtml += `
+                <tr>
+                    <td>${device.name}</td>
+                    <td class="${status.className}">
+                        ${status.text}
+                    </td>
+                    <td>${battery}%</td>
+                    <td>${speed} km/h</td>
+<td>${
+device.lastUpdate
+? new Date(device.lastUpdate).toLocaleString('de-DE')
+: '-'
+}</td>
+                </tr>
+            `;
+        });
+
+        document.getElementById(
+            'live-devices'
+        ).innerHTML = devicesHtml;
+
+        var avgBattery = 0;
+
+        if(batteryDevices > 0)
+        {
+            avgBattery =
+                Math.round(
+                    batteryTotal / batteryDevices
+                );
+        }
+
+        document.querySelectorAll(
+            '.card h1'
+        )[0].innerText =
+            data.devices.length;
+
+        document.querySelectorAll(
+            '.card h1'
+        )[1].innerText =
+            onlineCount;
+
+        document.querySelectorAll(
+            '.card h1'
+        )[2].innerText =
+            offlineCount;
+
+        document.querySelectorAll(
+            '.card h1'
+        )[3].innerText =
+            avgBattery + '%';
+
+        document.querySelector(
+            '.vehicle-table tbody'
+        ).innerHTML = tableHtml;
+
+        data.positions.forEach(function(position){
+
+            if(markers[position.deviceId])
+            {
+                markers[position.deviceId]
+                .setLatLng([
+                    position.latitude,
+                    position.longitude
+                ]);
+            }
+
+        });
+
+    });
+}
+
+updateMap();
+
+setInterval(updateMap, 5000);
+</script>

@@ -1,0 +1,10 @@
+[Unit]
+Description=TK GPS Firewall automatische Rücksetzung
+
+[Timer]
+OnActiveSec=5min
+AccuracySec=1s
+Unit=tk-gps-firewall-rollback.service
+
+[Install]
+WantedBy=timers.target

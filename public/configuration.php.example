@@ -1,0 +1,14 @@
+<?php
+
+class JConfig
+{
+    public $offline = false;
+    public $host = '127.0.0.1';
+    public $user = 'gps_local';
+    public $password = 'CHANGE_ME';
+    public $db = 'joomla_gps_local';
+    public $dbprefix = 'eusdi_';
+    public $dbtype = 'mysqli';
+    public $log_path = 'D:/Web/gps-portal/logs';
+    public $tmp_path = 'D:/Web/gps-portal/tmp';
+}

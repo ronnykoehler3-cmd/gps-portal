@@ -1,0 +1,364 @@
+<?php
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+use TKKundendienst\Component\Gpsportal\Site\Model\VehiclesModel;
+
+$app = Factory::getApplication();
+
+$model = new VehiclesModel();
+$editVehicle = null;
+
+if (
+    isset($_GET['edit'])
+    && (int) $_GET['edit'] > 0
+)
+{
+    $editVehicle = $model->getVehicle(
+        (int) $_GET['edit']
+    );
+}
+if (
+    isset($_GET['delete'])
+    && (int) $_GET['delete'] > 0
+)
+{
+    $model->deleteVehicle(
+        (int) $_GET['delete']
+    );
+
+    $app->enqueueMessage(
+        'Fahrzeug gelöscht'
+    );
+
+    $app->redirect(
+        'index.php?option=com_gpsportal&view=vehicles'
+    );
+
+    return;
+}
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+    && isset($_POST['save_vehicle'])
+)
+{
+if (
+    !empty($_POST['vehicle_id'])
+)
+{
+    $model->updateVehicle(
+        (int) $_POST['vehicle_id'],
+        [
+
+            'name'              => $_POST['name'] ?? '',
+            'license_plate'     => $_POST['license_plate'] ?? '',
+            'traccar_device_id' => $_POST['traccar_device_id'] ?? '',
+            'vehicle_type'      => $_POST['vehicle_type'] ?? '',
+            'manufacturer'      => $_POST['manufacturer'] ?? '',
+            'model'             => $_POST['model'] ?? '',
+            'driver'            => $_POST['driver'] ?? '',
+            'cost_center'       => $_POST['cost_center'] ?? '',
+            'color'             => $_POST['color'] ?? '',
+            'notes'             => $_POST['notes'] ?? ''
+
+        ]
+    );
+
+    $app->enqueueMessage(
+        'Fahrzeug aktualisiert'
+    );
+}
+else
+{
+    $model->saveVehicle([
+
+        'name'              => $_POST['name'] ?? '',
+        'license_plate'     => $_POST['license_plate'] ?? '',
+        'traccar_device_id' => $_POST['traccar_device_id'] ?? '',
+        'vehicle_type'      => $_POST['vehicle_type'] ?? '',
+        'manufacturer'      => $_POST['manufacturer'] ?? '',
+        'model'             => $_POST['model'] ?? '',
+        'driver'            => $_POST['driver'] ?? '',
+        'cost_center'       => $_POST['cost_center'] ?? '',
+        'color'             => $_POST['color'] ?? '',
+        'notes'             => $_POST['notes'] ?? ''
+    ]);
+
+    $app->enqueueMessage(
+        'Fahrzeug gespeichert'
+    );
+}
+    $app->redirect(
+        $_SERVER['REQUEST_URI']
+    );
+
+    return;
+}
+?>
+
+<style>
+
+.gps-card{
+    background:#fff;
+    border-radius:12px;
+    box-shadow:0 2px 10px rgba(0,0,0,.08);
+    padding:20px;
+    margin-bottom:20px;
+}
+
+.gps-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+    gap:20px;
+}
+
+.vehicle-card{
+    background:#fff;
+    border-radius:12px;
+    box-shadow:0 2px 12px rgba(0,0,0,.08);
+    padding:20px;
+}
+
+.vehicle-title{
+    font-size:22px;
+    font-weight:bold;
+    margin-bottom:10px;
+}
+
+.vehicle-row{
+    margin-bottom:8px;
+}
+
+.btn-delete{
+    background:#dc3545;
+    color:white;
+    padding:8px 12px;
+    border-radius:6px;
+    text-decoration:none;
+}
+
+.btn-delete:hover{
+    color:white;
+}
+
+input,
+textarea{
+    width:100%;
+    padding:10px;
+    border:1px solid #ccc;
+    border-radius:6px;
+}
+
+button{
+    background:#0d6efd;
+    color:white;
+    border:none;
+    padding:10px 20px;
+    border-radius:6px;
+}
+
+</style>
+
+<h1>Fahrzeuge</h1>
+
+<div class="gps-card">
+
+<h3>
+
+<?php if ($editVehicle) : ?>
+
+    Fahrzeug bearbeiten
+
+<?php else : ?>
+
+    Neues Fahrzeug anlegen
+
+<?php endif; ?>
+
+</h3>
+<form method="post">
+<input
+    type="hidden"
+    name="vehicle_id"
+    value="<?php echo $editVehicle->id ?? ''; ?>"
+>
+    <p>
+        <label>Fahrzeugname</label>
+<input
+    type="text"
+    name="name"
+    required
+    value="<?php echo htmlspecialchars($editVehicle->name ?? ''); ?>"
+>
+    </p>
+
+    <p>
+        <label>Kennzeichen</label>
+<input
+    type="text"
+    name="license_plate"
+    value="<?php echo htmlspecialchars($editVehicle->license_plate ?? ''); ?>"
+>
+    </p>
+
+    <p>
+        <label>Tracker-ID</label>
+<input
+    type="number"
+    name="traccar_device_id"
+    required
+    value="<?php echo (int) ($editVehicle->traccar_device_id ?? 0); ?>"
+>
+<p>
+    <label>Fahrzeugtyp</label>
+    <input
+        type="text"
+        name="vehicle_type"
+        value="<?php echo htmlspecialchars($editVehicle->vehicle_type ?? ''); ?>"
+    >
+</p>
+
+<p>
+    <label>Hersteller</label>
+    <input
+        type="text"
+        name="manufacturer"
+        value="<?php echo htmlspecialchars($editVehicle->manufacturer ?? ''); ?>"
+    >
+</p>
+
+<p>
+    <label>Modell</label>
+    <input
+        type="text"
+        name="model"
+        value="<?php echo htmlspecialchars($editVehicle->model ?? ''); ?>"
+    >
+</p>
+
+<p>
+    <label>Fahrer</label>
+    <input
+        type="text"
+        name="driver"
+        value="<?php echo htmlspecialchars($editVehicle->driver ?? ''); ?>"
+    >
+</p>
+
+<p>
+    <label>Kostenstelle</label>
+    <input
+        type="text"
+        name="cost_center"
+        value="<?php echo htmlspecialchars($editVehicle->cost_center ?? ''); ?>"
+    >
+</p>
+
+<p>
+    <label>Farbe</label>
+    <input
+        type="text"
+        name="color"
+        value="<?php echo htmlspecialchars($editVehicle->color ?? ''); ?>"
+    >
+</p>
+
+<p>
+    <label>Notizen</label>
+    <textarea
+        name="notes"
+        rows="4"
+    ><?php echo htmlspecialchars($editVehicle->notes ?? ''); ?></textarea>
+</p>
+
+    <button
+        type="submit"
+        name="save_vehicle">
+        Fahrzeug speichern
+    </button>
+
+</form>
+
+</div>
+
+<h2>Meine Fahrzeuge</h2>
+
+<div class="gps-grid">
+
+<?php foreach ($this->vehicles as $vehicle) : ?>
+
+<div class="vehicle-card">
+
+    <div class="vehicle-title">
+        <?php echo htmlspecialchars($vehicle->name ?? ''); ?>
+    </div>
+
+    <div class="vehicle-row">
+        <strong>Kennzeichen:</strong>
+        <?php echo htmlspecialchars($vehicle->license_plate ?? ''); ?>
+    </div>
+
+    <div class="vehicle-row">
+        <strong>Tracker-ID:</strong>
+        <?php echo (int) $vehicle->traccar_device_id; ?>
+    </div>
+
+    <div class="vehicle-row">
+        <strong>Typ:</strong>
+        <?php echo htmlspecialchars($vehicle->vehicle_type ?? ''); ?>
+    </div>
+
+    <div class="vehicle-row">
+        <strong>Fahrer:</strong>
+        <?php echo htmlspecialchars($vehicle->driver ?? ''); ?>
+    </div>
+
+    <div class="vehicle-row">
+        <strong>Hersteller:</strong>
+        <?php echo htmlspecialchars($vehicle->manufacturer ?? ''); ?>
+    </div>
+
+    <div class="vehicle-row">
+        <strong>Modell:</strong>
+        <?php echo htmlspecialchars($vehicle->model ?? ''); ?>
+    </div>
+
+    <div class="vehicle-row">
+        <strong>Kostenstelle:</strong>
+        <?php echo htmlspecialchars($vehicle->cost_center ?? ''); ?>
+    </div>
+<div class="vehicle-row">
+    <strong>Farbe:</strong>
+    <?php echo htmlspecialchars($vehicle->color ?? ''); ?>
+</div>
+
+<div class="vehicle-row">
+    <strong>Notizen:</strong><br>
+    <?php echo nl2br(htmlspecialchars($vehicle->notes ?? '')); ?>
+</div>
+    <br>
+<a
+    href="?option=com_gpsportal&view=vehicles&edit=<?php echo $vehicle->id; ?>"
+    style="
+        background:#ffc107;
+        color:black;
+        padding:8px 12px;
+        border-radius:6px;
+        text-decoration:none;
+        margin-right:10px;
+    ">
+    Bearbeiten
+</a>
+    <a
+        class="btn-delete"
+        href="?option=com_gpsportal&view=vehicles&delete=<?php echo $vehicle->id; ?>"
+        onclick="return confirm('Fahrzeug wirklich löschen?');">
+        Löschen
+    </a>
+
+</div>
+
+<?php endforeach; ?>
+
+</div>

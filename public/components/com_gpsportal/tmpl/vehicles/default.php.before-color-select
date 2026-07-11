@@ -1,0 +1,423 @@
+<?php
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+use TKKundendienst\Component\Gpsportal\Site\Model\VehiclesModel;
+
+$app = Factory::getApplication();
+
+$model = new VehiclesModel();
+$editVehicle = null;
+
+if (
+    isset($_GET['edit'])
+    && (int) $_GET['edit'] > 0
+)
+{
+    $editVehicle = $model->getVehicle(
+        (int) $_GET['edit']
+    );
+}
+
+if (
+    isset($_GET['delete'])
+    && (int) $_GET['delete'] > 0
+)
+{
+    $model->deleteVehicle(
+        (int) $_GET['delete']
+    );
+
+    $app->enqueueMessage(
+        'Fahrzeug gelöscht'
+    );
+
+    $app->redirect(
+        'index.php?option=com_gpsportal&view=vehicles'
+    );
+
+    return;
+}
+
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+    && isset($_POST['save_vehicle'])
+)
+{
+    if (!empty($_POST['vehicle_id']))
+    {
+        $model->updateVehicle(
+            (int) $_POST['vehicle_id'],
+            [
+                'name'              => $_POST['name'] ?? '',
+                'license_plate'     => $_POST['license_plate'] ?? '',
+                'tracker_unique_id' => $_POST['tracker_unique_id'] ?? '',
+                'vehicle_type'      => $_POST['vehicle_type'] ?? '',
+                'manufacturer'      => $_POST['manufacturer'] ?? '',
+                'model'             => $_POST['model'] ?? '',
+                'driver'            => $_POST['driver'] ?? '',
+                'cost_center'       => $_POST['cost_center'] ?? '',
+                'color'             => $_POST['color'] ?? '',
+		'marker_icon'       => $_POST['marker_icon'] ?? '',                
+		'notes'             => $_POST['notes'] ?? ''
+            ]
+        );
+
+        $app->enqueueMessage(
+            'Fahrzeug aktualisiert'
+        );
+    }
+    else
+    {
+        $model->saveVehicle([
+            'name'              => $_POST['name'] ?? '',
+            'license_plate'     => $_POST['license_plate'] ?? '',
+            'tracker_unique_id' => $_POST['tracker_unique_id'] ?? '',
+            'vehicle_type'      => $_POST['vehicle_type'] ?? '',
+            'manufacturer'      => $_POST['manufacturer'] ?? '',
+            'model'             => $_POST['model'] ?? '',
+            'driver'            => $_POST['driver'] ?? '',
+            'cost_center'       => $_POST['cost_center'] ?? '',
+            'color'             => $_POST['color'] ?? '',
+	    'marker_icon'       => $_POST['marker_icon'] ?? '',            
+	    'notes'             => $_POST['notes'] ?? ''
+        ]);
+
+        $app->enqueueMessage(
+            'Fahrzeug gespeichert'
+        );
+    }
+
+    $app->redirect(
+        $_SERVER['REQUEST_URI']
+    );
+
+    return;
+}
+
+?>
+
+
+<h1>Fahrzeuge</h1>
+<style>
+
+.portal-box{
+    background:#081327;
+    border:1px solid rgba(59,130,246,.15);
+    border-radius:18px;
+    padding:18px;
+    margin-bottom:18px;
+}
+
+.portal-box h2{
+    margin:0 0 12px 0;
+    font-size:24px;
+}
+
+.vehicle-form{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+}
+
+.vehicle-form .full{
+    grid-column:1 / -1;
+}
+
+.vehicle-form label{
+    display:block;
+    font-size:13px;
+    margin-bottom:3px;
+}
+
+.vehicle-form input,
+.vehicle-form textarea{
+    width:100%;
+    padding:8px 10px;
+    height:38px;
+    background:#081a37;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:8px;
+    color:#fff;
+}
+
+.vehicle-form textarea{
+    height:70px;
+}
+
+.save-btn{
+    height:38px;
+    padding:0 16px;
+}
+
+.vehicle-table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.vehicle-table th,
+.vehicle-table td{
+    padding:10px;
+}
+.action-buttons{
+    white-space:nowrap;
+}
+
+.btn-edit{
+    display:inline-block;
+    background:#2563eb;
+    color:#fff !important;
+    padding:8px 14px;
+    border-radius:8px;
+    text-decoration:none;
+    font-weight:600;
+    margin-right:6px;
+}
+
+.btn-delete{
+    display:inline-block;
+    background:#dc2626;
+    color:#fff !important;
+    padding:8px 14px;
+    border-radius:8px;
+    text-decoration:none;
+    font-weight:600;
+    margin-left:0;
+}
+</style>
+<div class="portal-box">
+
+<h2>
+
+<?php if ($editVehicle): ?>
+
+Fahrzeug bearbeiten
+
+<?php else: ?>
+
+Neues Fahrzeug anlegen
+
+<?php endif; ?>
+
+</h2>
+
+<form method="post" class="vehicle-form">
+
+<input
+    type="hidden"
+    name="vehicle_id"
+    value="<?php echo $editVehicle->id ?? ''; ?>"
+>
+
+<div>
+<label>Fahrzeugname</label>
+<input
+    type="text"
+    name="name"
+    required
+    value="<?php echo htmlspecialchars($editVehicle->name ?? ''); ?>"
+>
+</div>
+
+<div>
+<label>Kennzeichen</label>
+<input
+    type="text"
+    name="license_plate"
+    value="<?php echo htmlspecialchars($editVehicle->license_plate ?? ''); ?>"
+>
+</div>
+
+<div>
+<label>Tracker Unique ID</label>
+<input
+    type="text"
+    name="tracker_unique_id"
+    required
+    value="<?php echo htmlspecialchars($editVehicle->tracker_unique_id ?? ''); ?>"
+>
+</div>
+
+<div>
+<label>Fahrzeugtyp</label>
+<input
+    type="text"
+    name="vehicle_type"
+    value="<?php echo htmlspecialchars($editVehicle->vehicle_type ?? ''); ?>"
+>
+</div>
+
+<div>
+<label>Hersteller</label>
+<input
+    type="text"
+    name="manufacturer"
+    value="<?php echo htmlspecialchars($editVehicle->manufacturer ?? ''); ?>"
+>
+</div>
+
+<div>
+<label>Modell</label>
+<input
+    type="text"
+    name="model"
+    value="<?php echo htmlspecialchars($editVehicle->model ?? ''); ?>"
+>
+</div>
+
+<div>
+<label>Fahrer</label>
+<input
+    type="text"
+    name="driver"
+    value="<?php echo htmlspecialchars($editVehicle->driver ?? ''); ?>"
+>
+</div>
+
+<div>
+<label>Kostenstelle</label>
+<input
+    type="text"
+    name="cost_center"
+    value="<?php echo htmlspecialchars($editVehicle->cost_center ?? ''); ?>"
+>
+</div>
+
+<div>
+<label>Farbe</label>
+<input
+    type="text"
+    name="color"
+    value="<?php echo htmlspecialchars($editVehicle->color ?? ''); ?>"
+>
+</div>
+<div>
+<label>Kartensymbol</label>
+
+<select name="marker_icon">
+
+<option value=""
+<?php echo (($editVehicle->marker_icon ?? '') == '') ? 'selected' : ''; ?>>
+Standard
+</option>
+
+<option value="car"
+<?php echo (($editVehicle->marker_icon ?? '') == 'car') ? 'selected' : ''; ?>>
+🚗 PKW
+</option>
+
+<option value="van"
+<?php echo (($editVehicle->marker_icon ?? '') == 'van') ? 'selected' : ''; ?>>
+🚐 Transporter
+</option>
+
+<option value="truck"
+<?php echo (($editVehicle->marker_icon ?? '') == 'truck') ? 'selected' : ''; ?>>
+🚚 LKW
+</option>
+
+<option value="motorcycle"
+<?php echo (($editVehicle->marker_icon ?? '') == 'motorcycle') ? 'selected' : ''; ?>>
+🏍 Motorrad
+</option>
+
+<option value="phone"
+<?php echo (($editVehicle->marker_icon ?? '') == 'phone') ? 'selected' : ''; ?>>
+📱 Handy
+</option>
+
+<option value="tablet"
+<?php echo (($editVehicle->marker_icon ?? '') == 'tablet') ? 'selected' : ''; ?>>
+📟 Tablet
+</option>
+
+<option value="hearse"
+<?php echo (($editVehicle->marker_icon ?? '') == 'hearse') ? 'selected' : ''; ?>>
+⚰ Leichenwagen
+</option>
+
+</select>
+</div>
+<div class="full">
+<label>Notizen</label>
+<textarea
+    name="notes"
+    rows="4"
+><?php echo htmlspecialchars($editVehicle->notes ?? ''); ?></textarea>
+</div>
+
+<div class="full">
+<button
+    type="submit"
+    name="save_vehicle"
+    class="save-btn"
+>
+    Fahrzeug speichern
+</button>
+</div>
+
+</form>
+
+</div>
+
+<div class="portal-box">
+
+<h2>Meine Fahrzeuge</h2>
+
+<table class="vehicle-table">
+
+<thead>
+<tr>
+    <th>Name</th>
+    <th>Kennzeichen</th>
+    <th>Tracker</th>
+    <th>Typ</th>
+    <th>Fahrer</th>
+    <th>Aktionen</th>
+</tr>
+</thead>
+
+<tbody>
+
+<?php foreach ($this->vehicles as $vehicle): ?>
+
+<tr>
+
+<td><?php echo htmlspecialchars($vehicle->name ?? ''); ?></td>
+
+<td><?php echo htmlspecialchars($vehicle->license_plate ?? ''); ?></td>
+
+<td><?php echo htmlspecialchars($vehicle->tracker_unique_id ?? ''); ?></td>
+
+<td><?php echo htmlspecialchars($vehicle->vehicle_type ?? ''); ?></td>
+
+<td><?php echo htmlspecialchars($vehicle->driver ?? ''); ?></td>
+
+<td class="action-buttons">
+
+<a
+class="btn-edit"
+href="?option=com_gpsportal&view=vehicles&edit=<?php echo $vehicle->id; ?>">
+✏ Bearbeiten
+</a>
+
+<a
+class="btn-delete"
+href="?option=com_gpsportal&view=vehicles&delete=<?php echo $vehicle->id; ?>"
+onclick="return confirm('Fahrzeug wirklich löschen?');">
+🗑 Löschen
+
+</a>
+
+</td>
+
+</tr>
+
+<?php endforeach; ?>
+
+</tbody>
+
+</table>
+
+</div>

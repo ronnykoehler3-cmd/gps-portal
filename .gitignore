@@ -95,3 +95,6 @@ target/
 
 # Betriebssystem
 ehthumbs.db
+# Composer-Abhängigkeiten
+/public/vendor/
+/vendor/

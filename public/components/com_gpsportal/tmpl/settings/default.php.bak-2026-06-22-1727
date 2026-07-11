@@ -1,0 +1,59 @@
+<?php
+defined('_JEXEC') or die;
+?>
+
+<h1>Einstellungen</h1>
+
+<div class="vehicle-table">
+
+    <h2>Kartenansicht</h2>
+
+    <table>
+
+        <tr>
+            <td>Fahrzeugnamen anzeigen</td>
+            <td>
+                <?php echo $this->settings->show_vehicle_names ? 'Ja' : 'Nein'; ?>
+            </td>
+        </tr>
+
+        <tr>
+            <td>Geozonen anzeigen</td>
+            <td>
+                <?php echo $this->settings->show_geofences ? 'Ja' : 'Nein'; ?>
+            </td>
+        </tr>
+
+        <tr>
+            <td>Kartenposition merken</td>
+            <td>
+                <?php echo $this->settings->remember_map_position ? 'Ja' : 'Nein'; ?>
+            </td>
+        </tr>
+
+        <tr>
+            <td>Aktualisierung</td>
+            <td>
+                <?php echo (int) $this->settings->refresh_interval; ?>
+                Sekunden
+            </td>
+        </tr>
+
+    </table>
+
+</div>
+
+<div class="vehicle-table">
+
+    <h2>Status</h2>
+
+    <p>
+        Einstellungen-System erfolgreich vorbereitet.
+    </p>
+
+    <p>
+        Im nächsten Schritt können die Einstellungen gespeichert
+        und direkt in der Live-Karte verwendet werden.
+    </p>
+
+</div>

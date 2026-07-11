@@ -1,0 +1,13 @@
+[Unit]
+Description=TK Prüfung wichtiger Dienste nach dem Systemstart
+Wants=network-online.target
+After=network-online.target nftables.service fail2ban.service postgresql.service redis-server.service php8.2-fpm.service nginx.service traccar.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/tk-nightly-maintenance check-services
+TimeoutStartSec=10min
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

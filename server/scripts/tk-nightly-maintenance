@@ -1,0 +1,518 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+umask 077
+
+readonly BACKUP_ROOT="/var/backups/tk-nightly"
+readonly LOCK_FILE="/run/lock/tk-nightly-maintenance.lock"
+readonly TRACCAR_CONFIG="/opt/traccar/conf/traccar.xml"
+readonly RETENTION_DAYS="7"
+
+# Dienste, die nach einem Neustart laufen sollen.
+# Nicht installierte Dienste werden automatisch übersprungen.
+SERVICES=(
+    "nftables.service"
+    "fail2ban.service"
+    "postgresql.service"
+    "redis-server.service"
+    "php8.2-fpm.service"
+    "nginx.service"
+    "traccar.service"
+)
+
+log() {
+    printf '[%s] %s\n' "$(date '+%F %T')" "$*"
+    logger -t tk-nightly-maintenance -- "$*"
+}
+
+die() {
+    log "FEHLER: $*"
+    exit 1
+}
+
+require_root() {
+    [[ "$EUID" -eq 0 ]] || die "Dieses Skript muss als root laufen."
+}
+
+unit_exists() {
+    systemctl list-unit-files "$1" --no-legend 2>/dev/null |
+        grep -q "^${1}[[:space:]]"
+}
+
+check_free_space() {
+    local available_kb
+
+    available_kb="$(
+        df --output=avail "$BACKUP_ROOT" |
+            tail -1 |
+            tr -d '[:space:]'
+    )"
+
+    [[ "$available_kb" =~ ^[0-9]+$ ]] ||
+        die "Freier Speicher konnte nicht ermittelt werden."
+
+    # Mindestens 5 GiB freier Speicher erforderlich.
+    if (( available_kb < 5242880 )); then
+        die "Weniger als 5 GiB freier Speicher im Backup-Dateisystem."
+    fi
+
+    log "Freier Backup-Speicher: $((available_kb / 1024)) MiB"
+}
+
+detect_traccar_h2_database() {
+    python3 - "$TRACCAR_CONFIG" <<'PYTHON'
+import pathlib
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+config = pathlib.Path(sys.argv[1])
+
+if not config.is_file():
+    raise SystemExit(1)
+
+driver = ""
+database_url = ""
+
+try:
+    root = ET.parse(config).getroot()
+
+    for entry in root.iter("entry"):
+        key = entry.get("key")
+        value = (entry.text or "").strip()
+
+        if key == "database.driver":
+            driver = value
+        elif key == "database.url":
+            database_url = value
+
+except ET.ParseError:
+    content = config.read_text(encoding="utf-8", errors="replace")
+
+    driver_match = re.search(
+        r"""<entry\s+key\s*=\s*["']database\.driver["']\s*>(.*?)</entry>""",
+        content,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    url_match = re.search(
+        r"""<entry\s+key\s*=\s*["']database\.url["']\s*>(.*?)</entry>""",
+        content,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    if driver_match:
+        driver = driver_match.group(1).strip()
+
+    if url_match:
+        database_url = url_match.group(1).strip()
+
+if driver != "org.h2.Driver":
+    raise SystemExit(1)
+
+if not database_url.startswith("jdbc:h2:"):
+    raise SystemExit(1)
+
+database_path = database_url.removeprefix("jdbc:h2:")
+
+if database_path.startswith("./"):
+    database_path = "/opt/traccar/" + database_path[2:]
+elif not database_path.startswith("/"):
+    database_path = "/opt/traccar/" + database_path
+
+print(database_path)
+PYTHON
+}
+
+create_traccar_h2_backup() {
+    local destination="$1"
+    local database_base=""
+    local database_directory=""
+    local database_name=""
+    local traccar_was_active="no"
+
+    database_base="$(detect_traccar_h2_database)" ||
+        die "Traccar-H2-Datenbank konnte nicht aus $TRACCAR_CONFIG ermittelt werden."
+
+    database_directory="$(dirname "$database_base")"
+    database_name="$(basename "$database_base")"
+
+    log "Erkannte Traccar-H2-Datenbank: ${database_base}"
+
+    if systemctl is-active --quiet traccar.service; then
+        traccar_was_active="yes"
+
+        log "Stoppe Traccar kurz für ein konsistentes H2-Backup ..."
+
+        systemctl stop traccar.service
+
+        for _ in $(seq 1 30); do
+            if ! systemctl is-active --quiet traccar.service; then
+                break
+            fi
+
+            sleep 1
+        done
+
+        if systemctl is-active --quiet traccar.service; then
+            die "Traccar konnte für das Datenbankbackup nicht gestoppt werden."
+        fi
+    fi
+
+    restore_traccar() {
+        if [[ "$traccar_was_active" == "yes" ]]; then
+            log "Starte Traccar nach dem H2-Backup wieder ..."
+
+            systemctl start traccar.service || true
+
+            for _ in $(seq 1 30); do
+                if systemctl is-active --quiet traccar.service; then
+                    break
+                fi
+
+                sleep 1
+            done
+
+            if ! systemctl is-active --quiet traccar.service; then
+                log "FEHLER: Traccar konnte nach dem Backup nicht gestartet werden."
+                return 1
+            fi
+
+            log "Traccar läuft wieder."
+        fi
+    }
+
+    trap restore_traccar RETURN
+
+    [[ -d "$database_directory" ]] ||
+        die "Traccar-Datenordner fehlt: $database_directory"
+
+    shopt -s nullglob
+
+    local database_files=(
+        "${database_base}.mv.db"
+        "${database_base}.trace.db"
+        "${database_base}.lock.db"
+        "${database_base}.h2.db"
+    )
+
+    local existing_files=()
+    local file
+
+    for file in "${database_files[@]}"; do
+        if [[ -f "$file" ]]; then
+            existing_files+=("$file")
+        fi
+    done
+
+    (( ${#existing_files[@]} > 0 )) ||
+        die "Keine H2-Datenbankdateien zu ${database_base} gefunden."
+
+    log "Sichere Traccar-H2-Datenbankdateien ..."
+
+    tar \
+        --create \
+        --gzip \
+        --file="${destination}/traccar-h2-database.tar.gz" \
+        --numeric-owner \
+        "${existing_files[@]}"
+
+    [[ -s "${destination}/traccar-h2-database.tar.gz" ]] ||
+        die "Das Traccar-H2-Backup ist leer."
+
+    {
+        echo "Treiber: org.h2.Driver"
+        echo "Basisdatei: ${database_base}"
+        echo "Gesichert: $(date --iso-8601=seconds)"
+        echo
+        echo "Dateien:"
+
+        printf '%s\n' "${existing_files[@]}"
+    } > "${destination}/traccar-h2-information.txt"
+
+    restore_traccar
+    trap - RETURN
+}
+
+
+create_file_backup() {
+    local destination="$1"
+    local sources=()
+    local source
+
+    # Nur vorhandene Quellen werden aufgenommen.
+    for source in \
+        /etc \
+        /var/www \
+        /opt/traccar/conf \
+        /root/install-gps-firewall.sh \
+        /root/install-nightly-maintenance.sh \
+        /var/lib/tk-gps-firewall
+    do
+        if [[ -e "$source" ]]; then
+            sources+=("$source")
+        fi
+    done
+
+    (( ${#sources[@]} > 0 )) ||
+        die "Keine Sicherungsquellen gefunden."
+
+    log "Sichere System-, Web- und Traccar-Konfigurationen ..."
+
+    tar \
+        --create \
+        --gzip \
+        --file="${destination}/system-files.tar.gz" \
+        --acls \
+        --xattrs \
+        --numeric-owner \
+        --warning=no-file-changed \
+        "${sources[@]}"
+
+    [[ -s "${destination}/system-files.tar.gz" ]] ||
+        die "Das Datei-Backup ist leer."
+}
+
+create_system_information() {
+    local destination="$1"
+
+    {
+        echo "Backup-Zeit: $(date --iso-8601=seconds)"
+        echo "Hostname: $(hostname --fqdn 2>/dev/null || hostname)"
+        echo "Kernel: $(uname -a)"
+        echo
+        echo "=== Betriebssystem ==="
+        cat /etc/os-release 2>/dev/null || true
+        echo
+        echo "=== Dateisysteme ==="
+        df -hT
+        echo
+        echo "=== Dienste ==="
+
+        for service in "${SERVICES[@]}"; do
+            if unit_exists "$service"; then
+                printf '%-30s %s\n' \
+                    "$service" \
+                    "$(systemctl is-active "$service" 2>/dev/null || true)"
+            else
+                printf '%-30s %s\n' "$service" "nicht installiert"
+            fi
+        done
+
+        echo
+        echo "=== Offene Ports ==="
+        ss -tulpen
+
+        echo
+        echo "=== nftables ==="
+        nft list ruleset 2>/dev/null || true
+
+        echo
+        echo "=== Pakete ==="
+        dpkg-query -W \
+            -f='${binary:Package}\t${Version}\n' 2>/dev/null || true
+    } > "${destination}/system-information.txt"
+}
+
+create_checksums() {
+    local destination="$1"
+
+    log "Erzeuge SHA-256-Prüfsummen ..."
+
+    (
+        cd "$destination"
+
+        find . \
+            -maxdepth 1 \
+            -type f \
+            ! -name 'SHA256SUMS' \
+            -printf '%f\0' |
+            sort -z |
+            xargs -0 sha256sum \
+            > SHA256SUMS
+    )
+
+    (
+        cd "$destination"
+        sha256sum --check SHA256SUMS
+    )
+}
+
+cleanup_old_backups() {
+    log "Lösche Backups, die älter als ${RETENTION_DAYS} Tage sind ..."
+
+    find "$BACKUP_ROOT" \
+        -mindepth 1 \
+        -maxdepth 1 \
+        -type d \
+        -name '20??-??-??_??-??-??' \
+        -mtime "+${RETENTION_DAYS}" \
+        -print \
+        -exec rm -rf -- {} +
+}
+
+backup() {
+    local timestamp
+    local temporary_directory
+    local final_directory
+
+    timestamp="$(date '+%Y-%m-%d_%H-%M-%S')"
+    temporary_directory="${BACKUP_ROOT}/.${timestamp}.incomplete"
+    final_directory="${BACKUP_ROOT}/${timestamp}"
+
+    check_free_space
+
+    rm -rf "$temporary_directory"
+    install -d -m 0700 "$temporary_directory"
+
+    log "Backup gestartet: $timestamp"
+
+    create_system_information "$temporary_directory"
+    create_traccar_h2_backup "$temporary_directory"
+    create_file_backup "$temporary_directory"
+    create_checksums "$temporary_directory"
+
+    printf '%s\n' \
+        "Backup erfolgreich abgeschlossen: $(date --iso-8601=seconds)" \
+        > "${temporary_directory}/BACKUP_OK"
+
+    mv "$temporary_directory" "$final_directory"
+
+    cleanup_old_backups
+
+    log "Backup erfolgreich: $final_directory"
+}
+
+service_check() {
+    local service
+    local failures=0
+
+    log "Warte 45 Sekunden auf den vollständigen Systemstart ..."
+    sleep 45
+
+    log "Prüfe wichtige Dienste nach dem Neustart ..."
+
+    for service in "${SERVICES[@]}"; do
+        if ! unit_exists "$service"; then
+            log "ÜBERSPRUNGEN: $service ist nicht installiert."
+            continue
+        fi
+
+        if systemctl is-active --quiet "$service"; then
+            log "OK: $service läuft."
+            continue
+        fi
+
+        log "WARNUNG: $service läuft nicht. Starte den Dienst ..."
+
+        systemctl restart "$service" || true
+        sleep 5
+
+        if systemctl is-active --quiet "$service"; then
+            log "ERFOLG: $service wurde gestartet."
+        else
+            log "FEHLER: $service konnte nicht gestartet werden."
+            journalctl \
+                -u "$service" \
+                -n 30 \
+                --no-pager \
+                2>&1 |
+                logger -t tk-nightly-maintenance
+
+            failures=$((failures + 1))
+        fi
+    done
+
+    if (( failures > 0 )); then
+        die "${failures} Dienst(e) konnten nicht gestartet werden."
+    fi
+
+    log "Alle vorhandenen wichtigen Dienste laufen."
+}
+
+status() {
+    local service
+    local latest_backup=""
+
+    echo
+    echo "=== Wartungstimer ==="
+    systemctl status tk-nightly-reboot.timer --no-pager || true
+
+    echo
+    echo "=== Prüfung nach Systemstart ==="
+    systemctl status tk-postboot-service-check.service --no-pager || true
+
+    echo
+    echo "=== Dienste ==="
+
+    for service in "${SERVICES[@]}"; do
+        if unit_exists "$service"; then
+            printf '%-30s %s\n' \
+                "$service" \
+                "$(systemctl is-active "$service" 2>/dev/null || true)"
+        else
+            printf '%-30s %s\n' "$service" "nicht installiert"
+        fi
+    done
+
+    latest_backup="$(
+        find "$BACKUP_ROOT" \
+            -mindepth 1 \
+            -maxdepth 1 \
+            -type d \
+            -name '20??-??-??_??-??-??' \
+            -printf '%f\n' |
+            sort |
+            tail -1
+    )"
+
+    echo
+    echo "=== Letztes Backup ==="
+
+    if [[ -n "$latest_backup" ]]; then
+        echo "$BACKUP_ROOT/$latest_backup"
+        du -sh "$BACKUP_ROOT/$latest_backup"
+    else
+        echo "Noch kein abgeschlossenes Backup vorhanden."
+    fi
+
+    echo
+    echo "=== Freier Speicher ==="
+    df -h "$BACKUP_ROOT"
+}
+
+main() {
+    require_root
+    create_lock_directory="$(dirname "$LOCK_FILE")"
+    install -d -m 0755 "$create_lock_directory"
+
+    exec 9>"$LOCK_FILE"
+
+    if ! flock -n 9; then
+        die "Eine Wartung läuft bereits."
+    fi
+
+    case "${1:-}" in
+        backup)
+            backup
+            ;;
+
+        check-services)
+            service_check
+            ;;
+
+        status)
+            status
+            ;;
+
+        *)
+            echo "Verwendung:"
+            echo "  $0 backup"
+            echo "  $0 check-services"
+            echo "  $0 status"
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

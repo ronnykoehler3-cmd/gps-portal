@@ -1,0 +1,10 @@
+[Unit]
+Description=Wöchentliche TK GPS Geo-IP-Aktualisierung
+
+[Timer]
+OnCalendar=Sun *-*-* 04:15:00
+Persistent=true
+RandomizedDelaySec=15min
+
+[Install]
+WantedBy=timers.target

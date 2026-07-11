@@ -1,0 +1,33 @@
+[Unit]
+Description=TK GPS Demo-Fahrzeugsimulator
+Wants=network-online.target traccar.service
+After=network-online.target traccar.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/tk-gps-simulator
+ExecStart=/usr/bin/python3 /opt/tk-gps-simulator/simulator.py
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=30
+
+# Grundlegende Systemd-Härtung
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/tk-gps-simulator
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

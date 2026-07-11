@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="template" client="site" method="upgrade">
+    <name>tkgpsportal</name>
+    <creationDate>2026-06-09</creationDate>
+    <author>TK Kundendienst</author>
+    <version>1.0.0</version>
+    <description>TK GPS Portal Template</description>
+
+    <files>
+        <filename>index.php</filename>
+        <filename>templateDetails.xml</filename>
+
+        <folder>css</folder>
+        <folder>js</folder>
+        <folder>images</folder>
+    </files>
+
+    <positions>
+        <position>sidebar</position>
+        <position>top</position>
+        <position>footer</position>
+    	<position>login</position>
+    </positions>
+</extension>

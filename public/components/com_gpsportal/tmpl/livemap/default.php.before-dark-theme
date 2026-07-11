@@ -1,0 +1,478 @@
+<?php
+defined('_JEXEC') or die;
+
+$positionsByDevice = [];
+
+foreach ($this->positions as $position)
+{
+    $positionsByDevice[$position['deviceId']] = $position;
+}
+
+$totalDevices = count($this->devices);
+
+$onlineDevices = 0;
+
+foreach ($this->devices as $device)
+{
+    if (
+        isset($device['status']) &&
+        $device['status'] === 'online'
+    ) {
+        $onlineDevices++;
+    }
+}
+?>
+
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+
+.livemap-top{
+    display:flex;
+    gap:15px;
+    margin-bottom:20px;
+}
+
+.livemap-stat{
+    background:#fff;
+    padding:15px 20px;
+    border-radius:16px;
+    box-shadow:0 10px 25px rgba(0,0,0,.06);
+}
+
+.livemap-stat strong{
+    display:block;
+    font-size:30px;
+}
+
+.livemap-layout{
+    display:grid;
+    grid-template-columns:320px 1fr;
+    gap:20px;
+}
+
+.vehicle-sidebar{
+    background:#fff;
+    border-radius:16px;
+    padding:20px;
+    box-shadow:0 10px 25px rgba(0,0,0,.06);
+}
+
+.vehicle-sidebar h3{
+    margin-top:0;
+}
+
+.vehicle-entry{
+    padding:12px;
+    border-radius:10px;
+    border:1px solid #e5e7eb;
+    margin-bottom:10px;
+    cursor:pointer;
+}
+
+.vehicle-entry:hover{
+    background:#f3f4f6;
+}
+
+.vehicle-name{
+    font-weight:bold;
+}
+
+.vehicle-status{
+    margin-top:5px;
+}
+
+.map-wrapper{
+    background:#fff;
+    border-radius:16px;
+    padding:20px;
+    box-shadow:0 10px 25px rgba(0,0,0,.06);
+}
+
+#map{
+    height:700px;
+    border-radius:12px;
+}
+
+.status-online{
+    color:#16a34a;
+    font-weight:bold;
+}
+
+.status-offline{
+    color:#dc2626;
+    font-weight:bold;
+}
+
+.status-unknown{
+    color:#d97706;
+    font-weight:bold;
+}
+
+</style>
+
+<div class="livemap-top">
+
+    <div class="livemap-stat">
+        Fahrzeuge
+        <strong id="deviceCount">
+            <?php echo $totalDevices; ?>
+        </strong>
+    </div>
+
+    <div class="livemap-stat">
+        Online
+        <strong id="onlineCount">
+            <?php echo $onlineDevices; ?>
+        </strong>
+    </div>
+
+</div>
+
+<div class="livemap-layout">
+
+    <div class="vehicle-sidebar">
+
+        <h3>Fahrzeuge</h3>
+
+        <div id="vehicleList">
+
+            <?php foreach ($this->devices as $device): ?>
+
+                <?php
+                $position =
+                    $positionsByDevice[$device['id']]
+                    ?? null;
+                ?>
+
+                <div
+                    class="vehicle-entry"
+                    onclick="focusDevice(<?php echo $device['id']; ?>)"
+                >
+
+                    <div class="vehicle-name">
+                        <?php echo htmlspecialchars($device['name']); ?>
+                    </div>
+
+                    <div class="vehicle-status">
+
+                        <?php
+                        if (
+                            isset($device['status']) &&
+                            $device['status'] === 'online'
+                        ) {
+                            echo '🟢 Online';
+                        }
+                        else {
+                            echo '🔴 Offline';
+                        }
+                        ?>
+
+                    </div>
+
+                </div>
+
+            <?php endforeach; ?>
+
+        </div>
+
+    </div>
+
+    <div class="map-wrapper">
+
+        <div id="map"></div>
+
+    </div>
+
+</div>
+
+<script>
+
+var firstPosition =
+<?php echo json_encode($this->positions[0] ?? null); ?>;
+
+var map = L.map('map').setView(
+[
+    firstPosition.latitude,
+    firstPosition.longitude
+],
+14
+);
+
+L.tileLayer(
+'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+{
+    maxZoom:19
+}
+).addTo(map);
+
+var markers = {};
+var trails = {};
+var vehicleMeta =
+<?php echo json_encode($this->vehicleMeta ?? []); ?>;
+
+function getColor(color)
+{
+    switch(color)
+    {
+        case 'Schwarz':
+            return '#111111';
+
+        case 'Blau':
+            return '#2563eb';
+
+        case 'Rot':
+            return '#dc2626';
+
+        case 'Grün':
+            return '#16a34a';
+
+        case 'Gelb':
+            return '#eab308';
+
+        case 'Orange':
+            return '#f97316';
+
+        case 'Grau':
+            return '#6b7280';
+
+        case 'Weiß':
+            return '#ffffff';
+
+        default:
+            return '#2563eb';
+    }
+}
+
+function getSymbol(icon)
+{
+    switch(icon)
+    {
+        case 'car':
+            return '🚗';
+
+        case 'van':
+            return '🚐';
+
+        case 'truck':
+            return '🚚';
+
+        case 'motorcycle':
+            return '🏍️';
+
+        case 'phone':
+            return '📱';
+
+        case 'tablet':
+            return '📟';
+
+        case 'hearse':
+            return '⚰️';
+
+        default:
+            return '📍';
+    }
+}
+
+<?php foreach ($this->positions as $position): ?>
+
+var popupHtml = '';
+
+var meta =
+vehicleMeta[
+    <?php echo $position['deviceId']; ?>
+] || {};
+
+popupHtml += '<b>'
++ <?php echo json_encode(
+    $this->devices[
+        array_search(
+            $position['deviceId'],
+            array_column(
+                $this->devices,
+                'id'
+            )
+        )
+    ]['name'] ?? ''
+); ?>
++ '</b><br>';
+
+if(meta.license_plate)
+{
+    popupHtml +=
+        'Kennzeichen: '
+        + meta.license_plate
+        + '<br>';
+}
+
+if(meta.driver)
+{
+    popupHtml +=
+        'Fahrer: '
+        + meta.driver
+        + '<br>';
+}
+var markerColor =
+    getColor(meta.color);
+
+var markerSymbol =
+    getSymbol(meta.marker_icon);
+
+var vehicleIcon =
+L.divIcon({
+    className: '',
+
+    html:
+        '<div style="'
+        + 'background:'
+        + markerColor
+        + ';width:42px;'
+        + 'height:42px;'
+        + 'border-radius:50%;'
+        + 'display:flex;'
+        + 'align-items:center;'
+        + 'justify-content:center;'
+        + 'font-size:22px;'
+        + 'border:3px solid white;'
+        + 'box-shadow:0 2px 8px rgba(0,0,0,.35);'
+        + '">'
+        + markerSymbol
+        + '</div>',
+
+    iconSize:[42,42],
+    iconAnchor:[21,21]
+});
+markers[
+    <?php echo $position['deviceId']; ?>
+] =
+L.marker(
+[
+    <?php echo $position['latitude']; ?>,
+    <?php echo $position['longitude']; ?>
+],
+{
+    icon: vehicleIcon
+}
+)
+.addTo(map)
+.bindPopup(
+    popupHtml
+);
+
+<?php endforeach; ?>
+
+function focusDevice(deviceId)
+{
+    if(!markers[deviceId])
+    {
+        return;
+    }
+
+    map.setView(
+        markers[deviceId].getLatLng(),
+        16
+    );
+
+    markers[deviceId].openPopup();
+}
+
+function updateMap()
+{
+    fetch('/?option=com_gpsportal&view=api')
+    .then(response => response.json())
+    .then(data => {
+
+        var onlineCount = 0;
+        var vehicleHtml = '';
+
+        data.devices.forEach(function(device){
+
+            var statusText = '🔴 Offline';
+
+            if(device.status === 'online')
+            {
+                statusText = '🟢 Online';
+                onlineCount++;
+            }
+
+            vehicleHtml += `
+                <div
+                    class="vehicle-entry"
+                    onclick="focusDevice(${device.id})"
+                >
+                    <div class="vehicle-name">
+                        ${device.name}
+                    </div>
+
+                    <div class="vehicle-status">
+                        ${statusText}
+                    </div>
+                </div>
+            `;
+
+        });
+
+        document.getElementById(
+            'vehicleList'
+        ).innerHTML =
+            vehicleHtml;
+
+        document.getElementById(
+            'deviceCount'
+        ).innerText =
+            data.devices.length;
+
+        document.getElementById(
+            'onlineCount'
+        ).innerText =
+            onlineCount;
+
+        data.positions.forEach(function(position){
+if(markers[position.deviceId])
+{
+    var oldPos =
+        markers[position.deviceId]
+        .getLatLng();
+
+    var newPos = [
+        position.latitude,
+        position.longitude
+    ];
+
+    if(!trails[position.deviceId])
+    {
+        trails[position.deviceId] =
+L.polyline(
+    [
+        oldPos,
+        newPos
+    ],
+    {
+        color:'#ff7a00',
+        weight:4,
+        opacity:0.8
+    }
+
+        ).addTo(map);
+    }
+    else
+    {
+        trails[position.deviceId]
+        .addLatLng(newPos);
+    }
+
+    markers[position.deviceId]
+    .setLatLng(newPos);
+}
+        });
+
+    });
+}
+updateMap();
+
+setInterval(updateMap, 5000);
+
+</script>

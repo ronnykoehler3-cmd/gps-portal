@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="component" method="upgrade">
+
+    <name>com_gpsportal</name>
+
+    <author>TK Kundendienst</author>
+    <creationDate>2026-06-09</creationDate>
+    <copyright>TK Kundendienst</copyright>
+    <license>GPL v2 or later</license>
+    <authorEmail>info@tk-kundendienst.de</authorEmail>
+    <authorUrl>https://gps.tk-kundendienst.de</authorUrl>
+
+    <version>0.2.2</version>
+
+    <description>GPS Portal für Traccar Integration</description>
+
+    <namespace path="src">TKKundendienst\Component\Gpsportal</namespace>
+
+    <administration>
+
+        <menu>GPS Portal</menu>
+
+        <files folder="admin">
+
+            <filename>gpsportal.php</filename>
+            <filename>access.xml</filename>
+            <filename>config.xml</filename>
+
+            <folder>forms</folder>
+            <folder>language</folder>
+            <folder>services</folder>
+            <folder>sql</folder>
+            <folder>src</folder>
+            <folder>tmpl</folder>
+
+        </files>
+
+    </administration>
+
+    <site>
+
+        <files folder="site">
+
+            <filename>gpsportal.php</filename>
+
+            <folder>language</folder>
+            <folder>services</folder>
+            <folder>src</folder>
+            <folder>tmpl</folder>
+
+        </files>
+
+    </site>
+
+</extension>

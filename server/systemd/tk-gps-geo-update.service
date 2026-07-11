@@ -1,0 +1,8 @@
+[Unit]
+Description=TK GPS Geo-IP-Aktualisierung
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/install-gps-firewall.sh update-geo

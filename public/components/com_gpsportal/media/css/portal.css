@@ -1,0 +1,53 @@
+.gps-portal{
+    min-height:100vh;
+    background:#f4f6f9;
+}
+
+.portal-header{
+    height:70px;
+    background:#ffffff;
+    border-bottom:1px solid #ddd;
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    padding:0 20px;
+}
+
+.portal-container{
+    display:flex;
+}
+
+.portal-sidebar{
+    width:250px;
+    background:#ffffff;
+    border-right:1px solid #ddd;
+    min-height:calc(100vh - 70px);
+}
+
+.portal-sidebar ul{
+    list-style:none;
+    padding:20px;
+}
+
+.portal-sidebar li{
+    padding:12px 0;
+}
+
+.portal-content{
+    flex:1;
+    padding:25px;
+}
+
+.dashboard-cards{
+    display:flex;
+    gap:20px;
+}
+
+.card{
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    min-width:220px;
+}

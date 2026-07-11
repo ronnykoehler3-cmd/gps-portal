@@ -1,0 +1,34 @@
+<?php
+
+namespace TKKundendienst\Component\Gpsportal\Site\View\Dashboard;
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
+use TKKundendienst\Component\Gpsportal\Site\Model\TraccarModel;
+
+class HtmlView extends BaseHtmlView
+{
+    public $devices = [];
+    public $positions = [];
+
+    public function display($tpl = null)
+    {
+        $wa = Factory::getApplication()
+            ->getDocument()
+            ->getWebAssetManager();
+
+        $wa->registerAndUseStyle(
+            'gpsportal-dashboard',
+            'components/com_gpsportal/media/css/dashboard.css'
+        );
+
+        $model = new TraccarModel();
+
+        $this->devices = $model->getDevices();
+        $this->positions = $model->getPositions();
+
+        parent::display($tpl);
+    }
+}

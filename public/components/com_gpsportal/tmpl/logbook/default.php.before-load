@@ -1,0 +1,426 @@
+<?php
+defined('_JEXEC') or die;
+?>
+
+<style>
+
+.logbook-card{
+    background:#111827;
+    border:1px solid #374151;
+    border-radius:18px;
+    padding:15px;
+    color:#fff;
+    box-shadow:0 10px 25px rgba(0,0,0,.35);
+}
+
+.logbook-title{
+    font-size:24px;
+    font-weight:700;
+    margin-bottom:15px;
+}
+
+.top-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+}
+
+.tile{
+    background:#111827;
+    border:1px solid #374151;
+    border-radius:12px;
+    padding:10px;
+}
+
+.tile label{
+    display:block;
+    font-size:12px;
+    color:#cbd5e1;
+    margin-bottom:4px;
+}
+
+.tile input,
+.tile select{
+    width:100%;
+    background:#1f2937;
+    color:#fff;
+    border:1px solid #374151;
+    border-radius:8px;
+    padding:6px;
+    height:34px;
+}
+
+.route-btn{
+    width:100%;
+    height:34px;
+    margin-top:18px;
+    background:#f97316;
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+    margin-top:10px;
+}
+
+.stat-value{
+    display:block;
+    margin-top:5px;
+    color:#60a5fa;
+    font-size:18px;
+    font-weight:700;
+}
+
+.logbook-table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:15px;
+}
+
+.logbook-table th{
+    background:#1f2937;
+    border:1px solid #374151;
+    padding:10px;
+    text-align:left;
+}
+
+.logbook-table td{
+    border:1px solid #374151;
+    padding:10px;
+}
+
+.logbook-table input,
+.logbook-table select{
+    width:100%;
+    background:#111827;
+    color:#fff;
+    border:1px solid #374151;
+    border-radius:6px;
+    padding:6px;
+}
+
+.signature-box{
+    margin-top:20px;
+    background:#1f2937;
+    border:1px solid #374151;
+    border-radius:12px;
+    padding:15px;
+}
+}
+@media(max-width:1200px){
+
+    .top-grid,
+    .stats-grid{
+        grid-template-columns:1fr;
+    }
+}
+
+</style>
+
+<div class="logbook-card">
+
+<div class="logbook-title">
+Fahrtenbuch
+</div>
+
+<form method="post">
+
+<input type="hidden" name="option" value="com_gpsportal">
+<input type="hidden" name="view" value="logbook">
+<input type="hidden" name="task" value="logbook.save">
+
+<div class="top-grid">
+
+<div class="tile">
+<label>Fahrzeug</label>
+
+<select name="vehicle">
+
+<?php foreach ($this->vehicles as $vehicle): ?>
+
+<option
+value="<?php echo (int)$vehicle->traccar_device_id; ?>"
+<?php echo ((int)$this->vehicleId === (int)$vehicle->traccar_device_id) ? 'selected' : ''; ?>
+>
+
+<?php echo htmlspecialchars($vehicle->name); ?>
+
+</option>
+
+<?php endforeach; ?>
+
+</select>
+
+</div>
+
+<div class="tile">
+<label>Von</label>
+
+<input
+type="datetime-local"
+name="from"
+value="<?php echo htmlspecialchars($this->from); ?>"
+>
+
+</div>
+
+<div class="tile">
+<label>Bis</label>
+
+<input
+type="datetime-local"
+name="to"
+value="<?php echo htmlspecialchars($this->to); ?>"
+>
+
+</div>
+
+<div class="tile">
+<label>&nbsp;</label>
+
+<button
+class="route-btn"
+type="submit"
+>
+Fahrtenbuch anzeigen
+</button>
+
+</div>
+
+</div>
+
+<?php if (!empty($this->history)): ?>
+<div style="
+margin-top:10px;
+background:#1f2937;
+padding:10px;
+border-radius:10px;
+">
+
+Gefundene Fahrten:
+
+<strong>
+<?php echo count($this->trips); ?>
+</strong>
+
+</div>
+<div style="
+background:#166534;
+padding:10px;
+border-radius:10px;
+margin-top:10px;
+">
+
+Historie geladen:
+
+<strong>
+<?php echo count($this->history); ?>
+</strong>
+
+Positionen
+
+</div>
+
+<?php endif; ?>
+<div class="stats-grid">
+
+<div class="tile">
+Fahrten
+<span class="stat-value">
+<?php echo count($this->trips); ?>
+</span>
+</div>
+
+<div class="tile">
+Kilometer
+<span class="stat-value">
+
+<?php
+$totalKm = 0;
+
+foreach ($this->trips as $trip)
+{
+    $totalKm += $trip['distance'];
+}
+
+echo round($totalKm,1);
+?>
+
+km
+
+</span>
+</div>
+
+<div class="tile">
+Fahrzeit
+<span class="stat-value">
+
+<?php
+
+$totalMinutes = 0;
+
+foreach ($this->trips as $trip)
+{
+    $totalMinutes += (int)($trip['duration'] ?? 0);
+}
+
+echo floor($totalMinutes / 60) . ' h '
+    . ($totalMinutes % 60) . ' min';
+
+?>
+
+</span>
+</div>
+<div class="tile">
+Zeitraum
+<span class="stat-value">-</span>
+</div>
+
+</div>
+<table class="logbook-table">
+<thead>
+
+<tr>
+<th>Datum</th>
+<th>Startzeit</th>
+<th>Startadresse</th>
+<th>Fahrtart</th>
+<th>Endzeit</th>
+<th>Zieladresse</th>
+<th>Start-KM</th>
+<th>End-KM</th>
+<th>KM</th>
+<th>Dauer</th>
+<th>Fahrtgrund</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+<?php foreach ($this->trips as $trip): ?>
+<?php
+$tripKey = $trip['trip_key'];
+?>
+<tr>
+
+<td>
+<?php echo date('d.m.Y', strtotime($trip['start'])); ?>
+</td>
+
+<td>
+<?php echo date('H:i', strtotime($trip['start'])); ?>
+</td>
+
+<td>
+Adressauflösung folgt
+</td>
+
+<td>
+
+<select name="trip_type[<?php echo $tripKey; ?>]">
+<option>Geschäftlich</option>
+<option>Privat</option>
+<option>Arbeitsweg</option>
+
+</select>
+
+</td>
+
+<td>
+<?php echo date('H:i', strtotime($trip['end'])); ?>
+</td>
+
+<td>
+Adressauflösung folgt
+</td>
+
+<td>
+<?php echo $trip['start_km']; ?>
+</td>
+
+<td>
+<?php echo $trip['end_km']; ?>
+</td>
+
+<td>
+<?php echo $trip['distance']; ?>
+</td>
+<td>
+
+<?php
+
+$minutes = (int)($trip['duration'] ?? 0);
+
+echo floor($minutes / 60)
+    . ' h '
+    . ($minutes % 60)
+    . ' min';
+
+?>
+
+</td>
+
+<td>
+
+<input
+type="text"
+name="trip_reason[<?php echo $tripKey; ?>]"
+placeholder="Fahrtgrund"
+>
+</td>
+
+</tr>
+
+<?php endforeach; ?>
+
+</tbody>
+</table>
+<div class="signature-box">
+
+<h3>Bestätigung</h3>
+
+<br>
+
+Ort:
+
+____________________________________
+
+<br><br>
+
+Datum:
+
+____________________________________
+
+<br><br><br>
+
+Fahrer:
+
+____________________________________
+
+<br><br><br>
+
+Unternehmer:
+
+____________________________________
+
+</div>
+<div style="margin-top:20px;">
+
+<button
+type="submit"
+class="route-btn"
+style="max-width:250px;"
+>
+Fahrtenbuch speichern
+</button>
+
+</div>
+
+</form>
+</div>

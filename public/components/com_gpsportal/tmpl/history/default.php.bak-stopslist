@@ -1,0 +1,409 @@
+<?php
+defined('_JEXEC') or die;
+?>
+
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+
+.history-card{
+    background:#111827;
+    border:1px solid #374151;
+    border-radius:18px;
+    padding:25px;
+    color:#fff;
+    box-shadow:0 10px 25px rgba(0,0,0,.35);
+}
+
+.history-title{
+    font-size:24px;
+    font-weight:700;
+    margin-bottom:20px;
+}
+
+.history-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:15px;
+}
+
+.history-field{
+    display:flex;
+    flex-direction:column;
+}
+
+.history-field label{
+    margin-bottom:8px;
+    font-size:14px;
+}
+
+.history-field input,
+.history-field select{
+    background:#1f2937;
+    color:#fff;
+    border:1px solid #374151;
+    border-radius:10px;
+    padding:10px;
+}
+
+.history-button{
+    margin-top:20px;
+    background:#f97316;
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:12px 20px;
+    cursor:pointer;
+    font-weight:600;
+}
+
+.history-map{
+    margin-top:25px;
+    height:700px;
+    border-radius:16px;
+    overflow:hidden;
+    border:1px solid #374151;
+}
+
+.history-info{
+    margin-top:20px;
+    padding:15px;
+    background:#1f2937;
+    border-radius:12px;
+    border:1px solid #374151;
+}
+
+</style>
+
+<div class="history-card">
+
+    <div class="history-title">
+        Fahrhistorie
+    </div>
+
+    <form method="get">
+
+        <input
+            type="hidden"
+            name="option"
+            value="com_gpsportal"
+        >
+
+        <input
+            type="hidden"
+            name="view"
+            value="history"
+        >
+
+        <div class="history-grid">
+
+            <div class="history-field">
+
+                <label>Fahrzeug</label>
+
+                <select name="vehicle">
+
+                    <?php foreach ($this->vehicles as $vehicle): ?>
+
+                        <option
+                            value="<?php echo (int)$vehicle->traccar_device_id; ?>"
+                        >
+                            <?php echo htmlspecialchars($vehicle->name); ?>
+                        </option>
+
+                    <?php endforeach; ?>
+
+                </select>
+
+            </div>
+
+            <div class="history-field">
+
+                <label>Von</label>
+
+                <input
+                    type="datetime-local"
+                    name="from"
+                >
+
+            </div>
+
+            <div class="history-field">
+
+                <label>Bis</label>
+
+                <input
+                    type="datetime-local"
+                    name="to"
+                >
+
+            </div>
+
+        </div>
+
+        <button
+            type="submit"
+            class="history-button"
+        >
+            Route anzeigen
+        </button>
+
+    </form>
+
+<?php if (!empty($this->history)): ?>
+
+    <div class="history-info">
+
+        <strong>
+            Gefundene Positionen:
+            <?php echo count($this->history); ?>
+        </strong>
+
+    </div>
+
+    <div
+        id="historyMap"
+        class="history-map"
+    ></div>
+
+<?php else: ?>
+
+    <div class="history-map">
+    </div>
+
+<?php endif; ?>
+
+</div>
+
+<?php if (!empty($this->history)): ?>
+
+<script>
+
+var historyData =
+<?php echo json_encode($this->history); ?>;
+
+var map = L.map('historyMap');
+
+L.tileLayer(
+    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {
+        maxZoom: 19
+    }
+).addTo(map);
+
+var routePoints = [];
+
+historyData.forEach(function(pos){
+
+    routePoints.push([
+        pos.latitude,
+        pos.longitude
+    ]);
+
+});
+
+if(routePoints.length > 1)
+{
+    var routeLine =
+    L.polyline(
+        routePoints,
+        {
+            color:'#ff7a00',
+            weight:5,
+            opacity:0.9
+        }
+    ).addTo(map);
+
+    map.fitBounds(
+        routeLine.getBounds()
+    );
+
+    L.marker(
+        routePoints[0]
+    )
+    .addTo(map)
+    .bindPopup('🟢 Start');
+
+    L.marker(
+        routePoints[
+            routePoints.length - 1
+        ]
+    )
+    .addTo(map)
+    .bindPopup('🔴 Ende');
+}
+
+/*
+ * Stopps erkennen
+ */
+var stopStart = null;
+
+for (
+    var i = 0;
+    i < historyData.length;
+    i++
+)
+{
+    var pos = historyData[i];
+
+    var motion =
+        pos.attributes &&
+        pos.attributes.motion;
+
+    if(motion === false)
+    {
+        if(stopStart === null)
+        {
+            stopStart = pos;
+        }
+    }
+    else
+    {
+        if(stopStart !== null)
+        {
+            var stopEnd =
+                historyData[i - 1];
+
+            var startTime =
+                new Date(stopStart.fixTime);
+
+            var endTime =
+                new Date(stopEnd.fixTime);
+
+            var duration =
+                Math.round(
+                    (
+                        endTime -
+                        startTime
+                    ) / 1000 / 60
+                );
+
+            if(duration >= 5)
+            {
+                var stopIcon =
+                L.divIcon({
+                    className:'',
+                    html:
+                        '<div style="'
+                        + 'width:28px;'
+                        + 'height:28px;'
+                        + 'background:#dc2626;'
+                        + 'border:3px solid white;'
+                        + 'border-radius:50%;'
+                        + 'display:flex;'
+                        + 'align-items:center;'
+                        + 'justify-content:center;'
+                        + 'font-size:16px;'
+                        + 'color:white;'
+                        + 'font-weight:bold;'
+                        + '">⛔</div>',
+                    iconSize:[28,28],
+                    iconAnchor:[14,14]
+                });
+
+                L.marker(
+                    [
+                        stopStart.latitude,
+                        stopStart.longitude
+                    ],
+                    {
+                        icon: stopIcon
+                    }
+                )
+                .addTo(map)
+                .bindPopup(
+                    '<b>Pause</b><br>'
+                    + 'Beginn: '
+                    + startTime.toLocaleString()
+                    + '<br>'
+                    + 'Ende: '
+                    + endTime.toLocaleString()
+                    + '<br>'
+                    + 'Dauer: '
+                    + duration
+                    + ' Minuten'
+                );
+            }
+
+            stopStart = null;
+        }
+    }
+}
+
+/*
+ * Falls die Tour mit einer Pause endet
+ */
+if(stopStart !== null)
+{
+    var lastPos =
+        historyData[
+            historyData.length - 1
+        ];
+
+    var startTime =
+        new Date(stopStart.fixTime);
+
+    var endTime =
+        new Date(lastPos.fixTime);
+
+    var duration =
+        Math.round(
+            (
+                endTime -
+                startTime
+            ) / 1000 / 60
+        );
+
+    if(duration >= 5)
+    {
+        var stopIcon =
+        L.divIcon({
+            className:'',
+            html:
+                '<div style="'
+                + 'width:28px;'
+                + 'height:28px;'
+                + 'background:#dc2626;'
+                + 'border:3px solid white;'
+                + 'border-radius:50%;'
+                + 'display:flex;'
+                + 'align-items:center;'
+                + 'justify-content:center;'
+                + 'font-size:16px;'
+                + 'color:white;'
+                + 'font-weight:bold;'
+                + '">⛔</div>',
+            iconSize:[28,28],
+            iconAnchor:[14,14]
+        });
+
+        L.marker(
+            [
+                stopStart.latitude,
+                stopStart.longitude
+            ],
+            {
+                icon: stopIcon
+            }
+        )
+        .addTo(map)
+        .bindPopup(
+            '<b>Pause</b><br>'
+            + 'Beginn: '
+            + startTime.toLocaleString()
+            + '<br>'
+            + 'Ende: '
+            + endTime.toLocaleString()
+            + '<br>'
+            + 'Dauer: '
+            + duration
+            + ' Minuten'
+        );
+    }
+}
+</script>
+
+<?php endif; ?>
