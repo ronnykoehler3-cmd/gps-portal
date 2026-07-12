@@ -98,3 +98,9 @@ ehthumbs.db
 # Composer-Abhängigkeiten
 /public/vendor/
 /vendor/
+
+# Datenbank-Migrationen versionieren
+!database/
+database/*
+!database/migrations/
+!database/migrations/**
