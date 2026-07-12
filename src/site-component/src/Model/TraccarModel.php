@@ -278,6 +278,116 @@ class TraccarModel
         );
     }
 
+    /**
+     * Ermittelt die kundenbezogenen Fahrzeugnamen des aktuell
+     * angemeldeten Joomla-Benutzers.
+     *
+     * Rückgabeformat:
+     *
+     * [
+     *     Traccar-Geräte-ID => Anzeigename
+     * ]
+     */
+    private function getCurrentUserVehicleDisplayNames(): array
+    {
+        $user = Factory::getApplication()
+            ->getIdentity();
+
+        if (!$user || !$user->id) {
+            return [];
+        }
+
+        $db = Factory::getContainer()
+            ->get('DatabaseDriver');
+
+        $query = $db->getQuery(true)
+            ->select([
+                $db->quoteName(
+                    'd.traccar_device_id',
+                    'traccar_device_id'
+                ),
+                $db->quoteName(
+                    'ud.display_name',
+                    'display_name'
+                ),
+                $db->quoteName(
+                    'd.name',
+                    'default_name'
+                )
+            ])
+            ->from(
+                $db->quoteName(
+                    '#__gpsportal_user_devices',
+                    'ud'
+                )
+            )
+            ->join(
+                'INNER',
+                $db->quoteName(
+                    '#__gpsportal_devices',
+                    'd'
+                )
+                . ' ON '
+                . $db->quoteName('d.id')
+                . ' = '
+                . $db->quoteName('ud.device_id')
+            )
+            ->where(
+                $db->quoteName('ud.user_id')
+                . ' = '
+                . (int) $user->id
+            )
+            ->where(
+                $db->quoteName('d.published')
+                . ' = 1'
+            );
+
+        $db->setQuery($query);
+
+        $rows = $db->loadAssocList();
+
+        $result = [];
+
+        foreach ($rows as $row) {
+            $traccarDeviceId = (int) (
+                $row['traccar_device_id'] ?? 0
+            );
+
+            if ($traccarDeviceId <= 0) {
+                continue;
+            }
+
+            $displayName = trim(
+                (string) (
+                    $row['display_name'] ?? ''
+                )
+            );
+
+            $defaultName = trim(
+                (string) (
+                    $row['default_name'] ?? ''
+                )
+            );
+
+            $result[$traccarDeviceId] =
+                $displayName !== ''
+                    ? $displayName
+                    : $defaultName;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Lädt die für den aktuellen Benutzer sichtbaren Geräte.
+     *
+     * Für normale Benutzer wird das Feld "name" zentral durch den
+     * kundenbezogenen Anzeigenamen ersetzt. Der ursprüngliche Name
+     * aus Traccar bleibt zusätzlich unter "traccarName" erhalten.
+     *
+     * Super User erhalten weiterhin die vollständige technische
+     * Geräteliste mit den ursprünglichen Traccar-Namen.
+     */
     public function getDevices(): array
     {
         $devices = $this->request(
@@ -300,7 +410,10 @@ class TraccarModel
             return [];
         }
 
-        return array_values(
+        $displayNames =
+            $this->getCurrentUserVehicleDisplayNames();
+
+        $filteredDevices = array_values(
             array_filter(
                 $devices,
                 static function (
@@ -316,6 +429,43 @@ class TraccarModel
                 }
             )
         );
+
+        foreach ($filteredDevices as &$device) {
+            $deviceId = (int) (
+                $device['id'] ?? 0
+            );
+
+            $originalName = trim(
+                (string) (
+                    $device['name'] ?? ''
+                )
+            );
+
+            $device['traccarName'] =
+                $originalName;
+
+            $customerName = trim(
+                (string) (
+                    $displayNames[$deviceId]
+                    ?? ''
+                )
+            );
+
+            if ($customerName !== '') {
+                $device['name'] =
+                    $customerName;
+            }
+
+            $device['displayName'] =
+                (string) (
+                    $device['name']
+                    ?? $originalName
+                );
+        }
+
+        unset($device);
+
+        return $filteredDevices;
     }
 
     public function getPositions(): array
