@@ -15,42 +15,73 @@ public function getLastError(): string
 {
     return $this->lastError;
 }
-    public function getVehicles()
+    public function getVehicles(): array
     {
-        $user = Factory::getApplication()->getIdentity();
+        $user = Factory::getApplication()
+            ->getIdentity();
+
+        $userId = (int) ($user->id ?? 0);
+
+        if ($userId <= 0) {
+            return [];
+        }
+
         $db = Factory::getContainer()
             ->get('DatabaseDriver');
 
         $query = $db->getQuery(true)
-
-            ->select('d.*')
-
+            ->select([
+                'd.*',
+                $db->quoteName(
+                    'ud.display_name',
+                    'customer_display_name'
+                )
+            ])
             ->from(
                 $db->quoteName(
                     '#__gpsportal_devices',
                     'd'
                 )
             )
-
             ->join(
                 'INNER',
                 $db->quoteName(
                     '#__gpsportal_user_devices',
                     'ud'
                 )
-                . ' ON ud.device_id = d.id'
+                . ' ON '
+                . $db->quoteName('ud.device_id')
+                . ' = '
+                . $db->quoteName('d.id')
             )
-
             ->where(
-                'ud.user_id = '
-                . (int) $user->id
+                $db->quoteName('ud.user_id')
+                . ' = '
+                . $userId
             )
-
-            ->order('d.name ASC');
+            ->order(
+                $db->quoteName('ud.display_name')
+                . ' ASC'
+            );
 
         $db->setQuery($query);
 
-        return $db->loadObjectList();
+        $vehicles = $db->loadObjectList();
+
+        foreach ($vehicles as $vehicle) {
+            $customerName = trim(
+                (string) (
+                    $vehicle->customer_display_name
+                    ?? ''
+                )
+            );
+
+            if ($customerName !== '') {
+                $vehicle->name = $customerName;
+            }
+        }
+
+        return $vehicles;
     }
 
     public function getDocuments(int $vehicleId)
@@ -89,7 +120,7 @@ public function saveDocument(
     )
     {
         $this->lastError =
-            'Bitte zuerst eine Datei auswählen.';
+            'Bitte zuerst eine Datei auswÃ¤hlen.';
 
         return false;
     }
@@ -134,7 +165,7 @@ $maxSize = 20 * 1024 * 1024;
 if (($file['size'] ?? 0) > $maxSize)
 {
     $this->lastError =
-        'Die Datei darf maximal 20 MB groß sein.';
+        'Die Datei darf maximal 20 MB groÃŸ sein.';
 
     return false;
 }
@@ -155,7 +186,7 @@ $allowedMimeTypes = [
 if (!in_array($mimeType, $allowedMimeTypes))
 {
     $this->lastError =
-        'Ungültiger Dateityp erkannt.';
+        'UngÃ¼ltiger Dateityp erkannt.';
 
     return false;
 }
@@ -352,3 +383,4 @@ if (!$this->userCanAccessDocument($id))
     return true;
 }
 }
+

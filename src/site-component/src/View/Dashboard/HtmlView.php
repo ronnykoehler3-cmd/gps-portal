@@ -4,15 +4,16 @@ namespace TKKundendienst\Component\Gpsportal\Site\View\Dashboard;
 
 defined('_JEXEC') or die;
 
+use Joomla\CMS\Factory;
 use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
 use TKKundendienst\Component\Gpsportal\Site\Model\TraccarModel;
 
 class HtmlView extends BaseHtmlView
 {
-    public $devices = [];
-    public $positions = [];
-    public $geofenceEvents = [];    
-    public $traccarUserId = null;
+    public array $devices = [];
+    public array $positions = [];
+    public array $geofenceEvents = [];
+    public ?int $traccarUserId = null;
 
     public function display($tpl = null)
     {
@@ -26,37 +27,97 @@ class HtmlView extends BaseHtmlView
 
         $this->positions =
             $model->getPositions();
-$db = \Joomla\CMS\Factory::getContainer()
-    ->get('DatabaseDriver');
 
-$query = $db->getQuery(true)
+        $deviceNames = [];
+        $allowedDeviceIds = [];
 
-    ->select([
-        'e.*',
-        'g.name AS geofence_name',
-        'd.name AS vehicle_name'
-    ])
+        foreach ($this->devices as $device) {
+            $deviceId = (int) (
+                $device['id'] ?? 0
+            );
 
-    ->from('#__gpsportal_geofence_events e')
+            if ($deviceId <= 0) {
+                continue;
+            }
 
-    ->join(
-        'LEFT',
-        '#__gpsportal_geofences g
-        ON g.id = e.geofence_id'
-    )
+            $allowedDeviceIds[] = $deviceId;
 
-    ->join(
-        'LEFT',
-        '#__gpsportal_devices d
-        ON d.traccar_device_id = e.device_id'
-    )
+            $deviceNames[$deviceId] = trim(
+                (string) (
+                    $device['displayName']
+                    ?? $device['name']
+                    ?? ('Fahrzeug ' . $deviceId)
+                )
+            );
+        }
 
-    ->order('e.event_time DESC');
+        if (!empty($allowedDeviceIds)) {
+            $db = Factory::getContainer()
+                ->get('DatabaseDriver');
 
-$db->setQuery($query, 0, 5);
+            $query = $db->getQuery(true)
+                ->select([
+                    'e.*',
+                    'g.name AS geofence_name'
+                ])
+                ->from(
+                    $db->quoteName(
+                        '#__gpsportal_geofence_events',
+                        'e'
+                    )
+                )
+                ->join(
+                    'LEFT',
+                    $db->quoteName(
+                        '#__gpsportal_geofences',
+                        'g'
+                    )
+                    . ' ON '
+                    . $db->quoteName('g.id')
+                    . ' = '
+                    . $db->quoteName('e.geofence_id')
+                )
+                ->where(
+                    $db->quoteName('g.user_id')
+                    . ' = '
+                    . (int) Factory::getApplication()
+                        ->getIdentity()
+                        ->id
+                )
+                ->where(
+                    $db->quoteName('e.device_id')
+                    . ' IN ('
+                    . implode(
+                        ',',
+                        array_map(
+                            'intval',
+                            $allowedDeviceIds
+                        )
+                    )
+                    . ')'
+                )
+                ->order(
+                    $db->quoteName('e.event_time')
+                    . ' DESC'
+                );
 
-$this->geofenceEvents =
-    $db->loadObjectList();
+            $db->setQuery($query, 0, 5);
+
+            $events = $db->loadObjectList();
+
+            foreach ($events as $event) {
+                $deviceId = (int) (
+                    $event->device_id ?? 0
+                );
+
+                $event->vehicle_name =
+                    $deviceNames[$deviceId]
+                    ?? ('Fahrzeug ' . $deviceId);
+            }
+
+            $this->geofenceEvents = $events;
+        }
+
         ob_start();
 
         parent::display($tpl);

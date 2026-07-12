@@ -16,47 +16,111 @@ class HtmlView extends BaseHtmlView
 
         $model->checkGeofenceEvents();
 
-        $db = Factory::getContainer()
-            ->get('DatabaseDriver');
+        $devices = $model->getDevices();
+        $positions = $model->getPositions();
 
-        $query = $db->getQuery(true)
+        $deviceNames = [];
+        $allowedDeviceIds = [];
 
-            ->select([
-                'e.*',
-                'g.name AS geofence_name',
-                'd.name AS vehicle_name'
-            ])
+        foreach ($devices as $device) {
+            $deviceId = (int) ($device['id'] ?? 0);
 
-            ->from('#__gpsportal_geofence_events e')
+            if ($deviceId <= 0) {
+                continue;
+            }
 
-            ->join(
-                'LEFT',
-                '#__gpsportal_geofences g
-                ON g.id = e.geofence_id'
-            )
+            $allowedDeviceIds[] = $deviceId;
 
-            ->join(
-                'LEFT',
-                '#__gpsportal_devices d
-                ON d.traccar_device_id = e.device_id'
-            )
+            $deviceNames[$deviceId] = trim(
+                (string) (
+                    $device['displayName']
+                    ?? $device['name']
+                    ?? ('Fahrzeug ' . $deviceId)
+                )
+            );
+        }
 
-            ->order('e.id DESC');
+        $events = [];
 
-        $db->setQuery($query, 0, 20);
+        if (!empty($allowedDeviceIds)) {
+            $db = Factory::getContainer()
+                ->get('DatabaseDriver');
 
-        $events = $db->loadObjectList();
+            $query = $db->getQuery(true)
+                ->select([
+                    'e.*',
+                    'g.name AS geofence_name'
+                ])
+                ->from(
+                    $db->quoteName(
+                        '#__gpsportal_geofence_events',
+                        'e'
+                    )
+                )
+                ->join(
+                    'LEFT',
+                    $db->quoteName(
+                        '#__gpsportal_geofences',
+                        'g'
+                    )
+                    . ' ON '
+                    . $db->quoteName('g.id')
+                    . ' = '
+                    . $db->quoteName('e.geofence_id')
+                )
+                ->where(
+                    $db->quoteName('g.user_id')
+                    . ' = '
+                    . (int) Factory::getApplication()
+                        ->getIdentity()
+                        ->id
+                )
+                ->where(
+                    $db->quoteName('e.device_id')
+                    . ' IN ('
+                    . implode(
+                        ',',
+                        array_map(
+                            'intval',
+                            $allowedDeviceIds
+                        )
+                    )
+                    . ')'
+                )
+                ->order(
+                    $db->quoteName('e.id')
+                    . ' DESC'
+                );
+
+            $db->setQuery($query, 0, 20);
+
+            $events = $db->loadObjectList();
+
+            foreach ($events as $event) {
+                $deviceId = (int) (
+                    $event->device_id ?? 0
+                );
+
+                $event->vehicle_name =
+                    $deviceNames[$deviceId]
+                    ?? ('Fahrzeug ' . $deviceId);
+            }
+        }
 
         header(
             'Content-Type: application/json; charset=utf-8'
         );
 
-        echo json_encode([
-            'devices'        => $model->getDevices(),
-            'positions'      => $model->getPositions(),
-            'vehicleMeta'    => $model->getVehicleMeta(),
-            'geofenceEvents' => $events
-        ]);
+        echo json_encode(
+            [
+                'devices'        => $devices,
+                'positions'      => $positions,
+                'vehicleMeta'    => $model->getVehicleMeta(),
+                'geofenceEvents' => $events
+            ],
+            JSON_UNESCAPED_UNICODE
+            | JSON_UNESCAPED_SLASHES
+        );
 
         exit;
     }

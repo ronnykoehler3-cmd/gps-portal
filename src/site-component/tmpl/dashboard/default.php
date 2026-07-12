@@ -8,8 +8,6 @@ use TKKundendienst\Component\Gpsportal\Site\Helper\GpsHelper;
 $user = Factory::getApplication()->getIdentity();
 $totalDevices = count($this->devices);
 $onlineDevices = 0;
-$batteryTotal = 0;
-$batteryCount = 0;
 
 $positionsByDevice = [];
 
@@ -26,31 +24,6 @@ foreach ($this->devices as $device)
     ) {
         $onlineDevices++;
     }
-$position =
-    $positionsByDevice[$device['id']]
-    ?? [];
-
-$battery =
-    $position['attributes']['batteryLevel']
-    ?? null;
-
-if (
-    $battery !== null
-    && is_numeric($battery)
-)
-{
-    $batteryTotal += (float) $battery;
-    $batteryCount++;
-}
-}
-$averageBattery = 0;
-
-if ($batteryCount > 0)
-{
-    $averageBattery =
-        round(
-            $batteryTotal / $batteryCount
-        );
 }
 ?>
 
@@ -105,10 +78,6 @@ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <h3>Offline</h3>
     <h1><?php echo $totalDevices - $onlineDevices; ?></h1>
 </div>
-<div class="card">
-    <h3>Ø Batterie</h3>
-    <h1><?php echo $averageBattery; ?>%</h1>
-</div>
 </div>
 
 <div class="vehicle-table">
@@ -121,7 +90,6 @@ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
             <tr>
                 <th>Name</th>
                 <th>Status</th>
-                <th>Batterie</th>
                 <th>Geschwindigkeit</th>
                 <th>Letzte Meldung</th>
             </tr>
@@ -136,10 +104,6 @@ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
             $position =
                 $positionsByDevice[$device['id']]
                 ?? [];
-
-            $battery =
-                $position['attributes']['batteryLevel']
-                ?? '-';
 
             $speed =
                 round(
@@ -162,10 +126,6 @@ $lastUpdate =
 
                 <td>
                     <?php echo htmlspecialchars($device['status']); ?>
-                </td>
-
-                <td>
-                    <?php echo $battery; ?> %
                 </td>
 
                 <td>
