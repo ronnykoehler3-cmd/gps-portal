@@ -1,0 +1,16 @@
+{
+    "project":  "GPS-Portal",
+    "version":  "1.0.1-dev",
+    "channel":  "development",
+    "released_at":  "2026-07-13",
+    "minimum_version":  "1.0.0-dev",
+    "package":  "packages/gps-portal-1.0.1-dev.zip",
+    "sha256":  "b6880da1477cddbef31cf23884bfea81f63d32589390a9ddf7c9e603298330e9",
+    "changelog":  [
+                      "Kundenbezogene Fahrzeugnamen vereinheitlicht",
+                      "Geozonen-Ereignisse mandantensicher gefiltert",
+                      "Batterieanzeige aus dem Dashboard entfernt",
+                      "Oeffentliche Statistikdaten auf fiktive Werte umgestellt",
+                      "Updatebereich und Versionsverwaltung hinzugefuegt"
+                  ]
+}
