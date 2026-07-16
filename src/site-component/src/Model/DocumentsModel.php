@@ -120,7 +120,7 @@ public function saveDocument(
     )
     {
         $this->lastError =
-            'Bitte zuerst eine Datei auswÃ¤hlen.';
+            'Bitte zuerst eine Datei auswählen.';
 
         return false;
     }
@@ -186,7 +186,7 @@ $allowedMimeTypes = [
 if (!in_array($mimeType, $allowedMimeTypes))
 {
     $this->lastError =
-        'UngÃ¼ltiger Dateityp erkannt.';
+        'Ungültiger Dateityp erkannt.';
 
     return false;
 }

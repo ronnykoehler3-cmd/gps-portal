@@ -29,17 +29,12 @@ class UpdateBackupService
 
         $timestamp = date('Y-m-d_H-i-s');
 
-        $storageRoot =
-            JPATH_SITE
-            . '/storage/updates';
-
         $backupDirectory =
-            $storageRoot
-            . '/backups';
+            $this->getBackupDirectory();
 
         $temporaryDirectory =
-            $storageRoot
-            . '/temporary/backup-'
+            JPATH_SITE
+            . '/storage/updates/temporary/backup-'
             . $timestamp;
 
         $archiveFile =
@@ -155,11 +150,17 @@ class UpdateBackupService
                 | JSON_THROW_ON_ERROR
             );
 
-            file_put_contents(
-                $temporaryDirectory
-                . '/backup-manifest.json',
-                $manifestJson
-            );
+            if (
+                file_put_contents(
+                    $temporaryDirectory
+                    . '/backup-manifest.json',
+                    $manifestJson
+                ) === false
+            ) {
+                throw new RuntimeException(
+                    'Das Backup-Manifest konnte nicht gespeichert werden.'
+                );
+            }
 
             $this->createZipArchive(
                 $temporaryDirectory,
@@ -222,6 +223,190 @@ class UpdateBackupService
                 $temporaryDirectory
             );
         }
+    }
+
+    public function listBackups(): array
+    {
+        $backupDirectory =
+            $this->getBackupDirectory();
+
+        if (!is_dir($backupDirectory)) {
+            return [];
+        }
+
+        $files = glob(
+            $backupDirectory
+            . '/gps-portal-backup-*.zip'
+        );
+
+        if (!is_array($files)) {
+            return [];
+        }
+
+        $backups = [];
+
+        foreach ($files as $file) {
+            if (!is_file($file)) {
+                continue;
+            }
+
+            $filename = basename($file);
+
+            if (!$this->isValidBackupFilename($filename)) {
+                continue;
+            }
+
+            $size = filesize($file);
+            $modified = filemtime($file);
+            $sha256 = hash_file(
+                'sha256',
+                $file
+            );
+
+            if (
+                $size === false
+                || $modified === false
+                || !is_string($sha256)
+            ) {
+                continue;
+            }
+
+            $backups[] = [
+                'filename' => $filename,
+                'size_bytes' => (int) $size,
+                'created_at' => date(
+                    'Y-m-d H:i:s',
+                    $modified
+                ),
+                'timestamp' => (int) $modified,
+                'sha256' => strtolower($sha256),
+            ];
+        }
+
+        usort(
+            $backups,
+            static function (
+                array $left,
+                array $right
+            ): int {
+                return (
+                    $right['timestamp']
+                    ?? 0
+                ) <=> (
+                    $left['timestamp']
+                    ?? 0
+                );
+            }
+        );
+
+        return $backups;
+    }
+
+    public function downloadBackup(
+        string $filename
+    ): never {
+        $filename = basename(
+            trim($filename)
+        );
+
+        if (!$this->isValidBackupFilename($filename)) {
+            throw new RuntimeException(
+                'Der angeforderte Backupname ist ungueltig.'
+            );
+        }
+
+        $backupDirectory =
+            $this->getBackupDirectory();
+
+        $backupRoot =
+            realpath($backupDirectory);
+
+        $requestedFile =
+            realpath(
+                $backupDirectory
+                . DIRECTORY_SEPARATOR
+                . $filename
+            );
+
+        if (
+            $backupRoot === false
+            || $requestedFile === false
+            || !is_file($requestedFile)
+            || !str_starts_with(
+                $requestedFile,
+                $backupRoot
+                . DIRECTORY_SEPARATOR
+            )
+        ) {
+            throw new RuntimeException(
+                'Das angeforderte Backup wurde nicht gefunden.'
+            );
+        }
+
+        $fileSize = filesize(
+            $requestedFile
+        );
+
+        if ($fileSize === false) {
+            throw new RuntimeException(
+                'Die Backupgroesse konnte nicht ermittelt werden.'
+            );
+        }
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        header(
+            'Content-Type: application/zip'
+        );
+
+        header(
+            'Content-Disposition: attachment; filename="'
+            . $filename
+            . '"'
+        );
+
+        header(
+            'Content-Length: '
+            . $fileSize
+        );
+
+        header(
+            'X-Content-Type-Options: nosniff'
+        );
+
+        header(
+            'Cache-Control: private, no-store, no-cache, must-revalidate'
+        );
+
+        header(
+            'Pragma: no-cache'
+        );
+
+        readfile(
+            $requestedFile
+        );
+
+        exit;
+    }
+
+    private function getBackupDirectory(): string
+    {
+        return JPATH_SITE
+            . '/storage/updates/backups';
+    }
+
+    private function isValidBackupFilename(
+        string $filename
+    ): bool {
+        return preg_match(
+            '/^gps-portal-backup-'
+            . '\d{4}-\d{2}-\d{2}_'
+            . '\d{2}-\d{2}-\d{2}'
+            . '\.zip$/',
+            $filename
+        ) === 1;
     }
 
     private function readVersionInformation(): array

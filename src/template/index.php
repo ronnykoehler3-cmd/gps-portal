@@ -92,7 +92,7 @@ while ($currentMonth <= $lastMonth) {
 /*
  * Fiktive Ausgangswerte
  *
- * Die ?ffentliche Startseite verwendet ausschlie?lich
+ * Die öffentliche Startseite verwendet ausschließlich
  * fiktive Demonstrationswerte.
  */
 $baseVehicles = 35;
@@ -100,7 +100,7 @@ $baseOnline = 27;
 $baseKilometres = 321368;
 
 /*
- * Drei Aktualisierungsschritte ergeben zusammen ungef?hr
+ * Drei Aktualisierungsschritte ergeben zusammen ungefähr
  * 15 Prozent Wachstum pro Monat.
  */
 $monthlyGrowthFactor = 1.15;
@@ -131,8 +131,8 @@ $fictiveVehicles = max(
 /*
  * Online-Fahrzeuge
  *
- * Der Ausgangswert w?chst proportional zur Fahrzeugzahl.
- * Zus?tzlich bleibt die Onlinezahl immer kleiner oder
+ * Der Ausgangswert wächst proportional zur Fahrzeugzahl.
+ * Zusätzlich bleibt die Onlinezahl immer kleiner oder
  * gleich der Gesamtzahl.
  */
 $fictiveOnline = max(
