@@ -6,6 +6,29 @@ use Joomla\CMS\HTML\HTMLHelper;
 use Joomla\CMS\Router\Route;
 
 $user = Factory::getApplication()->getIdentity();
+
+$isSuperUserGroup = in_array(
+    8,
+    array_map(
+        'intval',
+        $user->getAuthorisedGroups()
+    ),
+    true
+);
+
+$isAdministrator =
+    $user
+    && $user->id
+    && (
+        $isSuperUserGroup
+        || $user->authorise(
+            'core.admin'
+        )
+        || $user->authorise(
+            'core.manage',
+            'com_gpsportal'
+        )
+    );
 ?>
 
 <aside class="gps-sidebar">
@@ -39,11 +62,9 @@ $user = Factory::getApplication()->getIdentity();
             Fahrtenbuch
         </a>
 
-        <?php if (false): // Berichte vorübergehend deaktiviert ?>
         <a href="index.php?option=com_gpsportal&view=reports">
             Berichte
         </a>
-        <?php endif; ?>
 
         <a href="index.php?option=com_gpsportal&view=geofences">
             Geozonen
@@ -58,6 +79,12 @@ $user = Factory::getApplication()->getIdentity();
         <a href="index.php?option=com_gpsportal&view=settings">
             Einstellungen
         </a>
+
+        <?php if ($isAdministrator): ?>
+            <a href="index.php?option=com_gpsportal&view=updates">
+                Updates
+            </a>
+        <?php endif; ?>
 
     </nav>
 
