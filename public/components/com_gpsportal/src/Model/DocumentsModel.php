@@ -15,6 +15,47 @@ public function getLastError(): string
 {
     return $this->lastError;
 }
+    private function getStoragePath(): string
+    {
+        $projectRoot = JPATH_ROOT;
+
+        /*
+         * Auf dem Produktionsserver liegt Joomla unter:
+         * /var/www/gps/public
+         *
+         * Der gesch?tzte Speicher liegt daneben unter:
+         * /var/www/gps/storage
+         */
+        if (
+            strtolower(
+                basename(
+                    str_replace('\\', '/', JPATH_ROOT)
+                )
+            ) === 'public'
+        ) {
+            $projectRoot = dirname(JPATH_ROOT);
+        }
+
+        $storagePath = $projectRoot
+            . DIRECTORY_SEPARATOR
+            . 'storage'
+            . DIRECTORY_SEPARATOR
+            . 'vehicles';
+
+        if (
+            !is_dir($storagePath)
+            && !mkdir($storagePath, 0770, true)
+            && !is_dir($storagePath)
+        ) {
+            $this->lastError =
+                'Der Dokumentenordner konnte nicht angelegt werden.';
+
+            return '';
+        }
+
+        return $storagePath
+            . DIRECTORY_SEPARATOR;
+    }
     public function getVehicles(): array
     {
         $user = Factory::getApplication()
@@ -138,8 +179,18 @@ public function saveDocument(
 
     $user = Factory::getApplication()->getIdentity();
 
-    $storagePath =
-        '/var/www/gps/storage/vehicles/';
+    $storagePath = $this->getStoragePath();
+
+    if (
+        $storagePath === ''
+        || !is_dir($storagePath)
+        || !is_writable($storagePath)
+    ) {
+        $this->lastError =
+            'Der Dokumentenordner ist nicht beschreibbar.';
+
+        return false;
+    }
 
     $extension =
         strtolower(
@@ -262,11 +313,23 @@ private function userCanAccessDocument(int $documentId): bool
 
         ->select('COUNT(*)')
 
-        ->from('#__gpsportal_vehicle_documents', 'd')
+        ->from(
+            $db->quoteName(
+                '#__gpsportal_vehicle_documents',
+                'd'
+            )
+        )
 
         ->join(
             'INNER',
-            '#__gpsportal_user_devices ud ON ud.device_id = d.vehicle_id'
+            $db->quoteName(
+                '#__gpsportal_user_devices',
+                'ud'
+            )
+            . ' ON '
+            . $db->quoteName('ud.device_id')
+            . ' = '
+            . $db->quoteName('d.vehicle_id')
         )
 
         ->where('d.id = ' . (int) $documentId)
@@ -317,8 +380,8 @@ if (!$this->userCanAccessDocument($id))
     }
 
     $file =
-        '/var/www/gps/storage/vehicles/'
-        . $document->filename;
+        $this->getStoragePath()
+            . basename((string) $document->filename);
 
     if (!file_exists($file))
     {
@@ -331,9 +394,85 @@ if (!$this->userCanAccessDocument($id))
     }
 
     header('Content-Description: File Transfer');
-    header('Content-Type: application/octet-stream');
+    $extension = strtolower(
+    pathinfo(
+        $document->original_name,
+        PATHINFO_EXTENSION
+    )
+);
+
+$mimeTypes = [
+    'pdf'  => 'application/pdf',
+    'jpg'  => 'image/jpeg',
+    'jpeg' => 'image/jpeg',
+    'png'  => 'image/png'
+];
+
+header(
+    'Content-Type: '
+    . ($mimeTypes[$extension]
+        ?? 'application/octet-stream')
+);
     header(
         'Content-Disposition: attachment; filename="'
+        . basename($document->original_name)
+        . '"'
+    );
+    header('Content-Length: ' . filesize($file));
+
+    readfile($file);
+
+    exit;
+}
+public function previewDocument(int $id)
+{
+    if (!$this->userCanAccessDocument($id))
+    {
+        return false;
+    }
+
+    $document = $this->getDocument($id);
+
+    if (!$document)
+    {
+        return false;
+    }
+
+    $file =
+        $this->getStoragePath()
+        . basename((string) $document->filename);
+
+    if (!file_exists($file))
+    {
+        return false;
+    }
+
+    $extension = strtolower(
+        pathinfo(
+            $document->original_name,
+            PATHINFO_EXTENSION
+        )
+    );
+
+    $mimeTypes = [
+        'pdf'  => 'application/pdf',
+        'jpg'  => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png'  => 'image/png'
+    ];
+
+    $mime =
+        $mimeTypes[$extension]
+        ?? 'application/octet-stream';
+
+    while (ob_get_level())
+    {
+        ob_end_clean();
+    }
+
+    header('Content-Type: ' . $mime);
+    header(
+        'Content-Disposition: inline; filename="'
         . basename($document->original_name)
         . '"'
     );
@@ -354,8 +493,8 @@ if (!$this->userCanAccessDocument($id))
     if ($document)
     {
         $file =
-            '/var/www/gps/storage/vehicles/'
-            . $document->filename;
+            $this->getStoragePath()
+            . basename((string) $document->filename);
 
         if (file_exists($file))
         {

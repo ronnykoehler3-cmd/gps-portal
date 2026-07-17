@@ -99,20 +99,26 @@ $isAdministrator =
         </div>
 
         <form
-            action="<?php echo Route::_('index.php?option=com_users&task=user.logout'); ?>"
-            method="post"
-        >
+    action="<?php echo Route::_('index.php?option=com_users&task=user.logout'); ?>"
+    method="post"
+>
 
-            <button
-                type="submit"
-                class="logout-btn sidebar-logout"
-            >
-                Logout
-            </button>
+    <button
+        type="submit"
+        class="logout-btn sidebar-logout"
+    >
+        Logout
+    </button>
 
-            <?php echo HTMLHelper::_('form.token'); ?>
+    <input
+        type="hidden"
+        name="return"
+        value="<?php echo base64_encode(Route::_('index.php?option=com_users&view=login', false)); ?>"
+    >
 
-        </form>
+    <?php echo HTMLHelper::_('form.token'); ?>
+
+</form>
 
     </div>
 
