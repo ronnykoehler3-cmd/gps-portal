@@ -1,20 +1,85 @@
-﻿# Roadmap - gps-portal
+﻿# Roadmap - GPS-Portal
 
-## Version 0.1
+---
 
-- Projektstruktur erstellen
-- Dokumentation beginnen
-- aktuellen Serverstand erfassen
+# Version 1.2.0 ✅
 
-## Version 0.5
+## Dokumentenverwaltung
 
-- Grundfunktionen sauber dokumentieren
-- Installationsanleitung erstellen
-- Backup-Konzept erstellen
+- ✔ Dokumentenvorschau
+- ✔ Download
+- ✔ Löschen
+- ✔ Dokumentensuche
+- ✔ Dokumentfilter
+- ✔ Responsive Darstellung
+- ✔ Rechteprüfung
+- ✔ Sichere Speicherung
+- ✔ Windows/Linux kompatibel
 
-## Version 1.0
+---
 
-- stabiler Release-Stand
-- vollstaendige Dokumentation
-- Update- und Wiederherstellungsanleitung
+# Version 1.3.0
 
+## Fahrerverwaltung
+
+Geplant:
+
+- Fahrer anlegen
+- Fahrer bearbeiten
+- Fahrer löschen
+- Führerschein speichern
+- Führerschein Ablaufdatum
+- Führerschein Erinnerungen
+- Fahrerfoto
+- Fahrzeugzuordnung
+
+---
+
+# Version 1.4.0
+
+## Geozonen
+
+- Länderbezogene Geozonen
+- Länder einfärben
+- Warnbereich vor Landesgrenze
+- Adressbasierte Geozonen
+- Geozonen anhand Adresse erstellen
+
+---
+
+# Version 1.5.0
+
+## Benachrichtigungen
+
+- E-Mail
+- SMS
+- Telegram
+- WhatsApp
+
+---
+
+# Version 1.6.0
+
+## Update-System
+
+- Updateserver
+- Updateprüfung
+- Automatische Updates
+- Rollback
+- Backup vor Update
+- Updateprotokoll
+
+---
+
+# Langfristige Ziele
+
+- Mandantenfähigkeit
+- REST API
+- Mobile App
+- Dashboard 2.0
+- Kartenmodule erweitern
+- Fahrtenbuch erweitern
+- Fahrzeugwartung
+- Rechnungen
+- Ticketsystem
+- Statistiken

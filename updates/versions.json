@@ -1,0 +1,13 @@
+﻿{
+    "latest": "1.2.0",
+    "versions": [
+        {
+            "version": "1.2.0",
+            "releaseDate": "2026-07-18",
+            "type": "stable",
+            "mandatory": false,
+            "sql": "20260718_001_documents_v2.sql",
+            "notes": "Dokumentenverwaltung 2.0"
+        }
+    ]
+}

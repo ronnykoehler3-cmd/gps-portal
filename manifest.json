@@ -1,0 +1,10 @@
+﻿{
+    "name": "GPS-Portal",
+    "vendor": "TK-Kundendienst GmbH",
+    "version": "1.2.0",
+    "releaseDate": "2026-07-18",
+    "minimumVersion": "1.0.0",
+    "updateChannel": "stable",
+    "updateServer": "https://updates.tk-kundendienst.de/gps-portal/",
+    "description": "GPS-Portal für Fahrzeugortung, Geozonen, Dokumente und Fahrtenbuch."
+}
