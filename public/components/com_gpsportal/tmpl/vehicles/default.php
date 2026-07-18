@@ -3,22 +3,25 @@
 defined('_JEXEC') or die;
 
 use Joomla\CMS\Factory;
+use Joomla\CMS\HTML\HTMLHelper;
 use TKKundendienst\Component\Gpsportal\Site\Model\VehiclesModel;
+use TKKundendienst\Component\Gpsportal\Site\Service\AdministratorService;
 
 $app = Factory::getApplication();
 $model = new VehiclesModel();
+$isAdministrator = (new AdministratorService())->isAdministrator();
 $editVehicle = null;
 
 if (isset($_GET['edit']) && (int) $_GET['edit'] > 0) {
     $editVehicle = $model->getVehicle((int) $_GET['edit']);
 }
 
-if (isset($_GET['delete']) && (int) $_GET['delete'] > 0) {
-    $model->deleteVehicle((int) $_GET['delete']);
-
-    $app->enqueueMessage('Fahrzeug gelöscht');
+if (isset($_GET['delete'])) {
+    $app->enqueueMessage(
+        'Löschen über einen URL-Aufruf ist aus Sicherheitsgründen nicht erlaubt.',
+        'warning'
+    );
     $app->redirect('index.php?option=com_gpsportal&view=vehicles');
-
     return;
 }
 
@@ -26,6 +29,13 @@ if (
     ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
     && isset($_POST['save_vehicle'])
 ) {
+    if (!$isAdministrator) {
+        throw new RuntimeException(
+            'Fahrzeuge dürfen ausschließlich von Administratoren angelegt oder bearbeitet werden.',
+            403
+        );
+    }
+
     $vehicleData = [
         'name' => $_POST['name'] ?? '',
         'license_plate' => $_POST['license_plate'] ?? '',
@@ -157,6 +167,7 @@ if (
 }
 </style>
 
+<?php if ($isAdministrator): ?>
 <div class="portal-box">
     <h2>
         <?php echo $editVehicle ? 'Fahrzeug bearbeiten' : 'Neues Fahrzeug anlegen'; ?>
@@ -368,6 +379,7 @@ if (
         </div>
     </form>
 </div>
+<?php endif; ?>
 
 <div class="portal-box">
     <h2>Meine Fahrzeuge</h2>
@@ -401,20 +413,27 @@ if (
                             '.'
                         ); ?> km</td>
                         <td class="action-buttons">
-                            <a
-                                class="btn-edit"
-                                href="?option=com_gpsportal&view=vehicles&edit=<?php echo (int) $vehicle->id; ?>"
-                            >
-                                Bearbeiten
-                            </a>
+                            <?php if ($isAdministrator): ?>
+                                <a
+                                    class="btn-edit"
+                                    href="?option=com_gpsportal&view=vehicles&edit=<?php echo (int) $vehicle->id; ?>"
+                                >
+                                    Bearbeiten
+                                </a>
+                            <?php endif; ?>
 
-                            <a
-                                class="btn-delete"
-                                href="?option=com_gpsportal&view=vehicles&delete=<?php echo (int) $vehicle->id; ?>"
-                                onclick="return confirm('Fahrzeug wirklich löschen?');"
+                            <form
+                                method="post"
+                                action="index.php?option=com_gpsportal&task=vehicles.hide"
+                                style="display:inline"
+                                onsubmit="return confirm('Fahrzeug nur aus deiner Ansicht entfernen?');"
                             >
-                                Löschen
-                            </a>
+                                <input type="hidden" name="device_id" value="<?php echo (int) $vehicle->id; ?>">
+                                <button type="submit" class="btn-delete">
+                                    Aus meiner Ansicht entfernen
+                                </button>
+                                <?php echo HTMLHelper::_('form.token'); ?>
+                            </form>
                         </td>
                     </tr>
                 <?php endforeach; ?>

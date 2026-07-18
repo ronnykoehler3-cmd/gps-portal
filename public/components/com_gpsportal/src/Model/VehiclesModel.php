@@ -6,6 +6,7 @@ defined('_JEXEC') or die;
 
 use Joomla\CMS\Factory;
 use Joomla\CMS\MVC\Model\BaseDatabaseModel;
+use TKKundendienst\Component\Gpsportal\Site\Service\AdministratorService;
 
 class VehiclesModel extends BaseDatabaseModel
 {
@@ -168,11 +169,20 @@ class VehiclesModel extends BaseDatabaseModel
                 . ' = '
                 . $db->quoteName('d.id')
             )
+            ->join(
+                'LEFT',
+                $db->quoteName('#__gpsportal_user_hidden_devices', 'uhd')
+                . ' ON ' . $db->quoteName('uhd.device_id')
+                . ' = ' . $db->quoteName('d.id')
+                . ' AND ' . $db->quoteName('uhd.user_id')
+                . ' = ' . (int) $user->id
+            )
             ->where(
                 $db->quoteName('ud.user_id')
                 . ' = '
                 . (int) $user->id
             )
+            ->where($db->quoteName('uhd.id') . ' IS NULL')
             ->order($db->quoteName('d.name') . ' ASC');
 
         $db->setQuery($query);
@@ -370,6 +380,7 @@ class VehiclesModel extends BaseDatabaseModel
 
     public function deleteVehicle(int $id): bool
     {
+        (new AdministratorService())->assertAdministrator();
         $db = Factory::getContainer()->get('DatabaseDriver');
 
         $query = $db->getQuery(true)

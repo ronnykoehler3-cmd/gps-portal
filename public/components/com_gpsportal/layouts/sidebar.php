@@ -81,6 +81,10 @@ $isAdministrator =
         </a>
 
         <?php if ($isAdministrator): ?>
+            <a href="index.php?option=com_gpsportal&view=demovehicles">
+                Dummyfahrzeuge
+            </a>
+
             <a href="index.php?option=com_gpsportal&view=updates">
                 Updates
             </a>
@@ -95,7 +99,7 @@ $isAdministrator =
         </div>
 
         <div class="sidebar-user-role">
-            Kunde
+            <?php echo $isAdministrator ? 'Administrator' : 'Kunde'; ?>
         </div>
 
         <form
