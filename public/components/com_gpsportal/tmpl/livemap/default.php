@@ -27,6 +27,7 @@ foreach ($this->devices as $device)
 href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/components/com_gpsportal/media/js/turf.min.js"></script>
 
 <style>
 
@@ -151,6 +152,32 @@ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 .leaflet-popup-content b{
     font-size:16px;
+}
+
+.livemap-geofence-toolbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:12px;
+    padding:10px 12px;
+    color:#e2e8f0;
+    background:#0b1d3a;
+    border:1px solid #374151;
+    border-radius:10px;
+}
+
+.livemap-geofence-toggle{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    cursor:pointer;
+    font-weight:700;
+}
+
+.livemap-geofence-toggle input{
+    width:18px;
+    height:18px;
 }
 
 .vehicle-speed{
@@ -325,6 +352,20 @@ echo htmlspecialchars(
 
     <div class="map-wrapper">
 
+        <?php if (!empty($this->geofences)): ?>
+        <div class="livemap-geofence-toolbar">
+            <label class="livemap-geofence-toggle" for="toggleLiveGeofences">
+                <input
+                    type="checkbox"
+                    id="toggleLiveGeofences"
+                    <?php echo $this->showGeofences ? 'checked' : ''; ?>
+                >
+                Geozonen auf der Livekarte anzeigen
+            </label>
+            <span><?php echo count($this->geofences); ?> Geozone(n)</span>
+        </div>
+        <?php endif; ?>
+
         <div id="map"></div>
 
         <div class="speed-legend" aria-label="Geschwindigkeitslegende">
@@ -337,6 +378,12 @@ echo htmlspecialchars(
             <span>➤ Fahrtrichtung</span>
             <span>🟢 Start</span>
             <span>🔴 Ende</span>
+            <strong>Geozonen</strong>
+            <span><i class="speed-color" style="background:#22c55e"></i>Erlaubt</span>
+            <span><i class="speed-color" style="background:#eab308"></i>Warnung</span>
+            <span><i class="speed-color" style="background:#ef4444"></i>Verboten</span>
+            <span><i class="speed-color" style="background:#3b82f6"></i>Warnpuffer</span>
+            <span><i class="speed-color" style="background:#f97316"></i>Verbots-Puffer</span>
         </div>
 
     </div>
@@ -602,30 +649,169 @@ map.on(
 );
 
 /* GPS-PORTAL-BASEMAP-SWITCHER-END */
-<?php if ($this->showGeofences): ?>
+var liveGeofences = <?php echo json_encode(
+    $this->geofences ?? [],
+    JSON_UNESCAPED_UNICODE
+    | JSON_UNESCAPED_SLASHES
+    | JSON_HEX_TAG
+    | JSON_HEX_AMP
+    | JSON_HEX_APOS
+    | JSON_HEX_QUOT
+); ?>;
+var liveGeofenceLayer = L.featureGroup();
+var liveGeofenceColors = {
+    green: '#22c55e',
+    yellow: '#eab308',
+    red: '#ef4444'
+};
+var liveBufferColors = {
+    yellow: '#3b82f6',
+    red: '#f97316'
+};
 
-<?php foreach ($this->geofences as $zone): ?>
-L.circle(
-    [
-        <?php echo (float)$zone->latitude; ?>,
-        <?php echo (float)$zone->longitude; ?>
-    ],
-    {
-        radius: <?php echo (int)$zone->radius; ?>,
-        color: '#3b82f6',
-        fillColor: '#60a5fa',
-        fillOpacity: 0.20
-    }
-)
-.addTo(map)
-.bindPopup(
-    '<strong><?php echo addslashes($zone->name); ?></strong><br>' +
-    'Radius: <?php echo (int)$zone->radius; ?> m'
-);
+function liveGeofencePopup(zone, extraText)
+{
+    var name = escapeMapHtml(zone.name || 'Geozone');
+    var statusLabels = {
+        green: 'Erlaubt',
+        yellow: 'Warnung',
+        red: 'Verboten'
+    };
+    var status = statusLabels[zone.status_color] || 'Geozone';
 
-<?php endforeach; ?>
+    return '<strong>' + name + '</strong><br>'
+        + 'Status: ' + status
+        + (extraText ? '<br>' + extraText : '');
+}
 
-<?php endif; ?>
+function drawLiveGeofences()
+{
+    liveGeofenceLayer.clearLayers();
+
+    liveGeofences.forEach(function (zone) {
+        var status = String(zone.status_color || 'green');
+        var color = liveGeofenceColors[status] || '#3b82f6';
+
+        if (String(zone.zone_type || 'address') === 'country') {
+            var geometry = null;
+
+            try {
+                geometry = typeof zone.geometry_json === 'string'
+                    ? JSON.parse(zone.geometry_json)
+                    : zone.geometry_json;
+            } catch (error) {
+                console.error('Ungültige Landesgeometrie', zone.name, error);
+                return;
+            }
+
+            if (!geometry) {
+                return;
+            }
+
+            var bufferKilometers = Math.max(
+                0,
+                Math.min(100, Number(zone.warning_buffer_km || 0))
+            );
+
+            if (
+                bufferKilometers > 0
+                && status !== 'green'
+                && window.turf
+                && liveBufferColors[status]
+            ) {
+                try {
+                    var buffered = turf.buffer(
+                        geometry,
+                        bufferKilometers,
+                        {units: 'kilometers'}
+                    );
+
+                    if (buffered) {
+                        L.geoJSON(buffered, {
+                            interactive: false,
+                            style: {
+                                color: liveBufferColors[status],
+                                weight: 2,
+                                dashArray: '7 5',
+                                fillColor: liveBufferColors[status],
+                                fillOpacity: 0.22
+                            }
+                        }).addTo(liveGeofenceLayer);
+                    }
+                } catch (error) {
+                    console.error(
+                        'Grenzpuffer konnte nicht gezeichnet werden',
+                        zone.name,
+                        error
+                    );
+                }
+            }
+
+            L.geoJSON(geometry, {
+                style: {
+                    color: color,
+                    weight: 2,
+                    fillColor: color,
+                    fillOpacity: 0.22
+                }
+            })
+                .bindPopup(
+                    liveGeofencePopup(
+                        zone,
+                        bufferKilometers > 0 && status !== 'green'
+                            ? 'Grenzpuffer: ' + bufferKilometers + ' km'
+                            : ''
+                    )
+                )
+                .addTo(liveGeofenceLayer);
+
+            return;
+        }
+
+        var latitude = Number(zone.latitude);
+        var longitude = Number(zone.longitude);
+        var radius = Math.max(10, Number(zone.radius || 100));
+
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            return;
+        }
+
+        L.circle([latitude, longitude], {
+            radius: radius,
+            color: color,
+            weight: 2,
+            fillColor: color,
+            fillOpacity: 0.20
+        })
+            .bindPopup(
+                liveGeofencePopup(zone, 'Radius: ' + radius + ' m')
+            )
+            .addTo(liveGeofenceLayer);
+    });
+}
+
+drawLiveGeofences();
+
+if (<?php echo json_encode((bool) $this->showGeofences); ?>) {
+    liveGeofenceLayer.addTo(map);
+}
+
+var liveGeofenceToggle = document.getElementById('toggleLiveGeofences');
+
+if (liveGeofenceToggle) {
+    liveGeofenceToggle.addEventListener('change', function () {
+        if (this.checked) {
+            liveGeofenceLayer.addTo(map);
+            liveGeofenceLayer.bringToBack();
+        } else {
+            map.removeLayer(liveGeofenceLayer);
+        }
+    });
+}
+
+if (map.hasLayer(liveGeofenceLayer)) {
+    liveGeofenceLayer.bringToBack();
+}
 var markers = {};
 var trailLayers = {};
 var trailLastPositions = {};

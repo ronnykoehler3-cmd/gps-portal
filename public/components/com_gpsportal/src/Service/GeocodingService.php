@@ -92,6 +92,68 @@ final class GeocodingService
         );
     }
 
+    public function resolveCountry(string $countryCode, string $countryName): array
+    {
+        $countryCode = strtolower(trim($countryCode));
+        $countryName = trim($countryName);
+
+        if (!preg_match('/^[a-z]{2}$/', $countryCode) || $countryName === '') {
+            throw new \RuntimeException('Das ausgewählte Land ist ungültig.');
+        }
+
+        $url = self::SEARCH_URL . '?' . http_build_query([
+            'country' => $countryName,
+            'countrycodes' => $countryCode,
+            'format' => 'jsonv2',
+            'polygon_geojson' => 1,
+            'limit' => 1,
+        ]);
+
+        $this->waitForRateLimit();
+        $curl = curl_init($url);
+        $options = [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+                'Accept-Language: de',
+                'User-Agent: TK-Kundendienst-GPS-Portal/1.2.6 (mail@tk-kundendienst.de)',
+            ],
+        ];
+        $windowsCaFile = 'E:/Programme/PHP/certs/cacert.pem';
+
+        if (PHP_OS_FAMILY === 'Windows' && is_file($windowsCaFile)) {
+            $options[CURLOPT_CAINFO] = $windowsCaFile;
+        }
+
+        curl_setopt_array($curl, $options);
+        $response = curl_exec($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $error = curl_error($curl);
+        curl_close($curl);
+        self::$lastRequestTime = microtime(true);
+
+        if (!is_string($response) || $status !== 200) {
+            throw new \RuntimeException('Landesgrenze konnte nicht geladen werden: ' . ($error ?: 'HTTP-Status ' . $status));
+        }
+
+        $results = json_decode($response, true);
+        $result = is_array($results) ? ($results[0] ?? null) : null;
+        $geometry = is_array($result) ? ($result['geojson'] ?? null) : null;
+
+        if (!is_array($result) || !is_array($geometry) || !isset($result['lat'], $result['lon'])) {
+            throw new \RuntimeException('Für dieses Land wurde keine Landesfläche gefunden.');
+        }
+
+        return [
+            'address' => (string) ($result['display_name'] ?? $countryName),
+            'latitude' => (float) $result['lat'],
+            'longitude' => (float) $result['lon'],
+            'geometry' => $geometry,
+        ];
+    }
+
     private function waitForRateLimit(): void
     {
         $elapsed = microtime(true) - self::$lastRequestTime;
