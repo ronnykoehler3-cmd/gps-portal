@@ -11,6 +11,7 @@ use Joomla\CMS\MVC\Model\BaseDatabaseModel;
 use TKKundendienst\Component\Gpsportal\Site\Service\AdministratorService;
 use TKKundendienst\Component\Gpsportal\Site\Service\GeocodingService;
 use TKKundendienst\Component\Gpsportal\Site\Service\SimulatorSyncService;
+use TKKundendienst\Component\Gpsportal\Site\Service\SimulatorStatusService;
 
 final class DemovehiclesModel extends BaseDatabaseModel
 {
@@ -25,6 +26,62 @@ final class DemovehiclesModel extends BaseDatabaseModel
         $db->setQuery($query);
 
         return $db->loadObjectList() ?: [];
+    }
+
+    public function getScheduleSettings(): object
+    {
+        (new AdministratorService())->assertAdministrator();
+        $db = Factory::getContainer()->get('DatabaseDriver');
+        $query = $db->getQuery(true)
+            ->select('*')
+            ->from($db->quoteName('#__gpsportal_demo_settings'))
+            ->where($db->quoteName('id') . ' = 1');
+        $db->setQuery($query);
+
+        return $db->loadObject() ?: (object) [
+            'working_weekdays' => '0,1,2,3,4,5',
+            'workday_start' => '06:30:00',
+            'workday_end' => '18:30:00',
+            'minimum_stop_minutes' => 15,
+            'maximum_stop_minutes' => 240,
+            'long_stop_probability' => 0.220,
+        ];
+    }
+
+    public function saveScheduleSettings(array $data): void
+    {
+        (new AdministratorService())->assertAdministrator();
+        $schedule = $this->validateSchedule($data);
+        $db = Factory::getContainer()->get('DatabaseDriver');
+        $row = (object) array_merge(['id' => 1], $schedule, [
+            'modified_by' => (int) Factory::getApplication()->getIdentity()->id,
+            'modified' => date('Y-m-d H:i:s'),
+        ]);
+
+        try {
+            $db->insertObject('#__gpsportal_demo_settings', $row);
+        } catch (\Throwable $error) {
+            if (stripos($error->getMessage(), 'Duplicate') === false) {
+                throw $error;
+            }
+            $db->updateObject('#__gpsportal_demo_settings', $row, 'id');
+        }
+
+        if (!empty($data['apply_to_all'])) {
+            $query = $db->getQuery(true)
+                ->update($db->quoteName('#__gpsportal_demo_vehicles'))
+                ->set($db->quoteName('working_weekdays') . ' = ' . $db->quote($schedule['working_weekdays']))
+                ->set($db->quoteName('workday_start') . ' = ' . $db->quote($schedule['workday_start']))
+                ->set($db->quoteName('workday_end') . ' = ' . $db->quote($schedule['workday_end']))
+                ->set($db->quoteName('minimum_stop_minutes') . ' = ' . (int) $schedule['minimum_stop_minutes'])
+                ->set($db->quoteName('maximum_stop_minutes') . ' = ' . (int) $schedule['maximum_stop_minutes'])
+                ->set($db->quoteName('long_stop_probability') . ' = ' . (float) $schedule['long_stop_probability']);
+            $db->setQuery($query)->execute();
+
+            foreach ($this->getDemoVehicles() as $vehicle) {
+                $this->enqueueVehicle($vehicle);
+            }
+        }
     }
 
     public function getUsers(): array
@@ -61,7 +118,7 @@ final class DemovehiclesModel extends BaseDatabaseModel
             ->order($db->quoteName('d.name') . ' ASC');
         $db->setQuery($query);
 
-        return $db->loadObjectList() ?: [];
+        return (new SimulatorStatusService())->enrich($db->loadObjectList() ?: []);
     }
 
     public function getDemoVehicle(int $deviceId): ?object
@@ -157,6 +214,7 @@ final class DemovehiclesModel extends BaseDatabaseModel
 
         $minimumSpeed = max(1, min(200, (int) ($data['minimum_speed_kmh'] ?? 20)));
         $maximumSpeed = max($minimumSpeed, min(200, (int) ($data['maximum_speed_kmh'] ?? 100)));
+        $schedule = $this->validateSchedule($data);
         $geocoder = new GeocodingService();
         $start = $geocoder->resolve((string) ($data['start_address'] ?? ''));
         $resolvedDestinations = [];
@@ -224,6 +282,12 @@ final class DemovehiclesModel extends BaseDatabaseModel
             'destinations_json' => json_encode($resolvedDestinations, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'minimum_speed_kmh' => $minimumSpeed,
             'maximum_speed_kmh' => $maximumSpeed,
+            'working_weekdays' => $schedule['working_weekdays'],
+            'workday_start' => $schedule['workday_start'],
+            'workday_end' => $schedule['workday_end'],
+            'minimum_stop_minutes' => $schedule['minimum_stop_minutes'],
+            'maximum_stop_minutes' => $schedule['maximum_stop_minutes'],
+            'long_stop_probability' => $schedule['long_stop_probability'],
             'active' => !empty($data['active']) ? 1 : 0,
             'sync_status' => 'pending',
             'created_by' => (int) Factory::getApplication()->getIdentity()->id,
@@ -266,6 +330,12 @@ final class DemovehiclesModel extends BaseDatabaseModel
             ),
             'minimum_speed_kmh' => $minimumSpeed,
             'maximum_speed_kmh' => $maximumSpeed,
+            'working_weekdays' => array_map('intval', explode(',', $schedule['working_weekdays'])),
+            'workday_start' => substr($schedule['workday_start'], 0, 5),
+            'workday_end' => substr($schedule['workday_end'], 0, 5),
+            'minimum_stop_minutes' => $schedule['minimum_stop_minutes'],
+            'maximum_stop_minutes' => $schedule['maximum_stop_minutes'],
+            'long_stop_probability' => $schedule['long_stop_probability'],
             'active' => (bool) $row->active,
         ]);
 
@@ -428,6 +498,12 @@ final class DemovehiclesModel extends BaseDatabaseModel
             'destinations_json' => $template->destinations_json,
             'minimum_speed_kmh' => $template->minimum_speed_kmh,
             'maximum_speed_kmh' => $template->maximum_speed_kmh,
+            'working_weekdays' => $template->working_weekdays ?? '0,1,2,3,4,5',
+            'workday_start' => $template->workday_start ?? '06:30:00',
+            'workday_end' => $template->workday_end ?? '18:30:00',
+            'minimum_stop_minutes' => $template->minimum_stop_minutes ?? 15,
+            'maximum_stop_minutes' => $template->maximum_stop_minutes ?? 240,
+            'long_stop_probability' => $template->long_stop_probability ?? 0.220,
             'active' => 1,
             'sync_status' => 'pending',
             'created_by' => (int) Factory::getApplication()->getIdentity()->id,
@@ -450,6 +526,12 @@ final class DemovehiclesModel extends BaseDatabaseModel
             ),
             'minimum_speed_kmh' => (int) $template->minimum_speed_kmh,
             'maximum_speed_kmh' => (int) $template->maximum_speed_kmh,
+            'working_weekdays' => array_map('intval', explode(',', (string) ($template->working_weekdays ?? '0,1,2,3,4,5'))),
+            'workday_start' => substr((string) ($template->workday_start ?? '06:30:00'), 0, 5),
+            'workday_end' => substr((string) ($template->workday_end ?? '18:30:00'), 0, 5),
+            'minimum_stop_minutes' => (int) ($template->minimum_stop_minutes ?? 15),
+            'maximum_stop_minutes' => (int) ($template->maximum_stop_minutes ?? 240),
+            'long_stop_probability' => (float) ($template->long_stop_probability ?? 0.220),
             'active' => true,
         ]);
     }
@@ -521,6 +603,68 @@ final class DemovehiclesModel extends BaseDatabaseModel
                 }
             }
         }
+    }
+
+    private function validateSchedule(array $data): array
+    {
+        $weekdays = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($data['working_weekdays'] ?? [])),
+            static fn (int $day): bool => $day >= 0 && $day <= 6
+        )));
+
+        if ($weekdays === []) {
+            throw new \RuntimeException('Bitte mindestens einen Fahrtag auswählen.');
+        }
+
+        sort($weekdays);
+        $start = trim((string) ($data['workday_start'] ?? '06:30'));
+        $end = trim((string) ($data['workday_end'] ?? '18:30'));
+
+        if (!preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $start)
+            || !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $end)
+            || $start >= $end) {
+            throw new \RuntimeException('Start- und Endzeit sind ungültig. Die Endzeit muss nach der Startzeit liegen.');
+        }
+
+        $minimumStop = max(1, min(1440, (int) ($data['minimum_stop_minutes'] ?? 15)));
+        $maximumStop = max($minimumStop, min(1440, (int) ($data['maximum_stop_minutes'] ?? 240)));
+        $probability = max(0.0, min(1.0, (float) ($data['long_stop_probability'] ?? 0.220)));
+
+        return [
+            'working_weekdays' => implode(',', $weekdays),
+            'workday_start' => $start . ':00',
+            'workday_end' => $end . ':00',
+            'minimum_stop_minutes' => $minimumStop,
+            'maximum_stop_minutes' => $maximumStop,
+            'long_stop_probability' => $probability,
+        ];
+    }
+
+    private function enqueueVehicle(object $vehicle): void
+    {
+        $destinations = json_decode((string) $vehicle->destinations_json, true) ?: [];
+        (new SimulatorSyncService())->enqueueUpsert([
+            'name' => (string) $vehicle->name,
+            'unique_id' => (string) $vehicle->tracker_unique_id,
+            'region' => (string) $vehicle->region,
+            'home' => [(float) $vehicle->start_longitude, (float) $vehicle->start_latitude],
+            'waypoints' => array_merge(
+                [[(float) $vehicle->start_longitude, (float) $vehicle->start_latitude]],
+                array_map(static fn (array $destination): array => [
+                    (float) ($destination['longitude'] ?? 0),
+                    (float) ($destination['latitude'] ?? 0),
+                ], $destinations)
+            ),
+            'minimum_speed_kmh' => (int) $vehicle->minimum_speed_kmh,
+            'maximum_speed_kmh' => (int) $vehicle->maximum_speed_kmh,
+            'working_weekdays' => array_map('intval', explode(',', (string) $vehicle->working_weekdays)),
+            'workday_start' => substr((string) $vehicle->workday_start, 0, 5),
+            'workday_end' => substr((string) $vehicle->workday_end, 0, 5),
+            'minimum_stop_minutes' => (int) $vehicle->minimum_stop_minutes,
+            'maximum_stop_minutes' => (int) $vehicle->maximum_stop_minutes,
+            'long_stop_probability' => (float) $vehicle->long_stop_probability,
+            'active' => (bool) $vehicle->active,
+        ]);
     }
 
     private function isLocalTest(): bool

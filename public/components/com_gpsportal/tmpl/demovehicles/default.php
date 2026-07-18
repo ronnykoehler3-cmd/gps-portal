@@ -14,6 +14,7 @@ $input = $app->input;
 $gpsStatus = '';
 $gpsMessage = '';
 $editVehicle = $this->editVehicle;
+$scheduleSettings = $this->scheduleSettings;
 $editDestinations = [];
 if ($editVehicle) {
     foreach (json_decode((string) $editVehicle->destinations_json, true) ?: [] as $destination) {
@@ -30,7 +31,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         $model = new DemovehiclesModel();
         $action = $input->post->getCmd('demo_action');
 
-        if ($action === 'assign_initial') {
+        if ($action === 'save_schedule_settings') {
+            $model->saveScheduleSettings([
+                'working_weekdays' => $input->post->get('working_weekdays', [], 'array'),
+                'workday_start' => $input->post->getString('workday_start'),
+                'workday_end' => $input->post->getString('workday_end'),
+                'minimum_stop_minutes' => $input->post->getInt('minimum_stop_minutes'),
+                'maximum_stop_minutes' => $input->post->getInt('maximum_stop_minutes'),
+                'long_stop_probability' => (float) $input->post->getString('long_stop_probability'),
+                'apply_to_all' => $input->post->getInt('apply_to_all'),
+            ]);
+            $gpsMessage = 'Die Standard-Fahrzeiten wurden gespeichert.';
+            $this->scheduleSettings = $model->getScheduleSettings();
+        } elseif ($action === 'assign_initial') {
             $assigned = $model->assignInitialVehicles($input->post->getInt('user_id'), 4);
             $gpsMessage = $assigned . ' Demofahrzeuge wurden dem Benutzer zugeordnet.';
         } elseif ($action === 'assign_vehicle') {
@@ -58,6 +71,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 'destinations' => $input->post->getRaw('destinations', ''),
                 'minimum_speed_kmh' => $input->post->getInt('minimum_speed_kmh'),
                 'maximum_speed_kmh' => $input->post->getInt('maximum_speed_kmh'),
+                'working_weekdays' => $input->post->get('working_weekdays', [], 'array'),
+                'workday_start' => $input->post->getString('workday_start'),
+                'workday_end' => $input->post->getString('workday_end'),
+                'minimum_stop_minutes' => $input->post->getInt('minimum_stop_minutes'),
+                'maximum_stop_minutes' => $input->post->getInt('maximum_stop_minutes'),
+                'long_stop_probability' => (float) $input->post->getString('long_stop_probability'),
                 'active' => $input->post->getInt('active'),
             ]);
             $gpsMessage = 'Das Dummyfahrzeug wurde zentral gespeichert.';
@@ -76,7 +95,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 ?>
 
 <style>
-.demo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.demo-card{background:#081327;border:1px solid rgba(59,130,246,.25);border-radius:16px;padding:18px}.demo-card-wide{grid-column:1/-1}.demo-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.demo-form .full{grid-column:1/-1}.demo-form label{display:block;margin-bottom:5px;color:#93c5fd}.demo-form input,.demo-form select,.demo-form textarea{width:100%;padding:10px;background:#0b1d3a;color:#fff;border:1px solid #29466f;border-radius:8px}.demo-form textarea{min-height:110px}.demo-button{padding:10px 16px;background:#2563eb;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:pointer}.demo-button-danger{background:#dc2626}.demo-button-muted{background:#475569}.demo-table{width:100%;border-collapse:collapse}.demo-table th,.demo-table td{text-align:left;padding:10px;border-bottom:1px solid #1e3557;vertical-align:top}.demo-actions{display:flex;gap:8px;flex-wrap:wrap}.demo-actions form{display:inline}.sync-pending{color:#facc15}.demo-notice{margin:0 0 18px;padding:14px 16px;border-radius:10px;font-weight:700}.demo-notice-success{color:#86efac;background:#052e1a;border:1px solid #15803d}.demo-notice-error{color:#fecaca;background:#3f1018;border:1px solid #dc2626}@media(max-width:900px){.demo-grid,.demo-form{grid-template-columns:1fr}.demo-card-wide,.demo-form .full{grid-column:1}.demo-table{display:block;overflow:auto}}
+.demo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.demo-card{background:#081327;border:1px solid rgba(59,130,246,.25);border-radius:16px;padding:18px}.demo-card-wide{grid-column:1/-1}.demo-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.demo-form .full{grid-column:1/-1}.demo-form label{display:block;margin-bottom:5px;color:#93c5fd}.demo-form input,.demo-form select,.demo-form textarea{width:100%;padding:10px;background:#0b1d3a;color:#fff;border:1px solid #29466f;border-radius:8px}.demo-form textarea{min-height:110px}.weekday-list{display:flex;gap:8px;flex-wrap:wrap}.weekday-list label{padding:8px 10px;background:#0b1d3a;border:1px solid #29466f;border-radius:8px}.weekday-list input{width:auto}.demo-button{padding:10px 16px;background:#2563eb;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:pointer}.demo-button-danger{background:#dc2626}.demo-button-muted{background:#475569}.demo-table{width:100%;border-collapse:collapse}.demo-table th,.demo-table td{text-align:left;padding:10px;border-bottom:1px solid #1e3557;vertical-align:top}.demo-actions{display:flex;gap:8px;flex-wrap:wrap}.demo-actions form{display:inline}.status-driving{color:#4ade80}.status-paused{color:#facc15}.status-outside,.status-inactive{color:#94a3b8}.status-synchronised{color:#60a5fa}.demo-notice{margin:0 0 18px;padding:14px 16px;border-radius:10px;font-weight:700}.demo-notice-success{color:#86efac;background:#052e1a;border:1px solid #15803d}.demo-notice-error{color:#fecaca;background:#3f1018;border:1px solid #dc2626}@media(max-width:900px){.demo-grid,.demo-form{grid-template-columns:1fr}.demo-card-wide,.demo-form .full{grid-column:1}.demo-table{display:block;overflow:auto}}
 </style>
 
 <h1>Dummyfahrzeuge verwalten</h1>
@@ -87,6 +106,23 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 <?php endif; ?>
 
 <div class="demo-grid">
+    <section class="demo-card demo-card-wide">
+        <h2>Standard-Fahrzeiten für Demofahrzeuge</h2>
+        <p>Diese Werte gelten für neue Fahrzeuge. Auf Wunsch werden sie sofort auf alle vorhandenen Demofahrzeuge übertragen.</p>
+        <form method="post" class="demo-form">
+            <input type="hidden" name="demo_action" value="save_schedule_settings">
+            <div class="full"><label>Fahrtage</label><div class="weekday-list"><?php foreach (['Mo','Di','Mi','Do','Fr','Sa','So'] as $day => $label): ?><label><input type="checkbox" name="working_weekdays[]" value="<?php echo $day; ?>"<?php echo in_array($day, array_map('intval', explode(',', (string) $scheduleSettings->working_weekdays)), true) ? ' checked' : ''; ?>> <?php echo $label; ?></label><?php endforeach; ?></div></div>
+            <div><label>Frühester Fahrtbeginn</label><input type="time" name="workday_start" value="<?php echo $escape(substr((string) $scheduleSettings->workday_start, 0, 5)); ?>" required></div>
+            <div><label>Spätestes Fahrtende</label><input type="time" name="workday_end" value="<?php echo $escape(substr((string) $scheduleSettings->workday_end, 0, 5)); ?>" required></div>
+            <div><label>Kürzeste Pause (Minuten)</label><input type="number" min="1" max="1440" name="minimum_stop_minutes" value="<?php echo (int) $scheduleSettings->minimum_stop_minutes; ?>" required></div>
+            <div><label>Längste Pause (Minuten)</label><input type="number" min="1" max="1440" name="maximum_stop_minutes" value="<?php echo (int) $scheduleSettings->maximum_stop_minutes; ?>" required></div>
+            <div><label>Wahrscheinlichkeit einer langen Pause (0 bis 1)</label><input type="number" min="0" max="1" step="0.01" name="long_stop_probability" value="<?php echo $escape((string) $scheduleSettings->long_stop_probability); ?>" required></div>
+            <div><label><input type="checkbox" name="apply_to_all" value="1"> Auf alle vorhandenen Demofahrzeuge anwenden</label></div>
+            <div class="full"><button class="demo-button">Standard-Fahrzeiten speichern</button></div>
+            <?php echo HTMLHelper::_('form.token'); ?>
+        </form>
+    </section>
+
     <section class="demo-card demo-card-wide">
         <h2>Benutzer mit vier Demofahrzeugen ausstatten</h2>
         <p>Es werden zuerst freie Fahrzeuge aus dem Demofahrzeug-Bestand verwendet.</p>
@@ -110,6 +146,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             <div><label>Startadresse</label><input name="start_address" value="<?php echo $escape($editVehicle->start_address ?? ''); ?>" placeholder="Straße, PLZ Ort" required></div>
             <div><label>Minimale Geschwindigkeit</label><input type="number" min="1" max="200" name="minimum_speed_kmh" value="<?php echo (int) ($editVehicle->minimum_speed_kmh ?? 20); ?>" required></div>
             <div><label>Maximale Geschwindigkeit</label><input type="number" min="1" max="200" name="maximum_speed_kmh" value="<?php echo (int) ($editVehicle->maximum_speed_kmh ?? 100); ?>" required></div>
+            <?php $vehicleWeekdays = array_map('intval', explode(',', (string) ($editVehicle->working_weekdays ?? $scheduleSettings->working_weekdays))); ?>
+            <div class="full"><label>Fahrtage dieses Fahrzeugs</label><div class="weekday-list"><?php foreach (['Mo','Di','Mi','Do','Fr','Sa','So'] as $day => $label): ?><label><input type="checkbox" name="working_weekdays[]" value="<?php echo $day; ?>"<?php echo in_array($day, $vehicleWeekdays, true) ? ' checked' : ''; ?>> <?php echo $label; ?></label><?php endforeach; ?></div></div>
+            <div><label>Fahrtbeginn</label><input type="time" name="workday_start" value="<?php echo $escape(substr((string) ($editVehicle->workday_start ?? $scheduleSettings->workday_start), 0, 5)); ?>" required></div>
+            <div><label>Fahrtende</label><input type="time" name="workday_end" value="<?php echo $escape(substr((string) ($editVehicle->workday_end ?? $scheduleSettings->workday_end), 0, 5)); ?>" required></div>
+            <div><label>Kürzeste Pause (Minuten)</label><input type="number" min="1" max="1440" name="minimum_stop_minutes" value="<?php echo (int) ($editVehicle->minimum_stop_minutes ?? $scheduleSettings->minimum_stop_minutes); ?>" required></div>
+            <div><label>Längste Pause (Minuten)</label><input type="number" min="1" max="1440" name="maximum_stop_minutes" value="<?php echo (int) ($editVehicle->maximum_stop_minutes ?? $scheduleSettings->maximum_stop_minutes); ?>" required></div>
+            <div><label>Wahrscheinlichkeit lange Pause</label><input type="number" min="0" max="1" step="0.01" name="long_stop_probability" value="<?php echo $escape((string) ($editVehicle->long_stop_probability ?? $scheduleSettings->long_stop_probability)); ?>" required></div>
             <div class="full"><label>Zieladressen – eine Adresse pro Zeile</label><textarea name="destinations" required><?php echo $escape(implode("\n", $editDestinations)); ?></textarea></div>
             <div><label><input type="checkbox" name="fixed_assignment" value="1"<?php echo $editVehicle && $editVehicle->fixed_assignment ? ' checked' : ''; ?>> Feste Zuordnung</label></div>
             <div><label><input type="checkbox" name="active" value="1"<?php echo !$editVehicle || $editVehicle->active ? ' checked' : ''; ?>> Simulator aktiv</label></div>
@@ -120,11 +163,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
     <section class="demo-card demo-card-wide">
         <h2>Zentraler Demofahrzeug-Bestand</h2>
-        <table class="demo-table"><thead><tr><th>Fahrzeug</th><th>Zuordnung</th><th>Start</th><th>Geschwindigkeit</th><th>Status</th><th>Aktionen</th></tr></thead><tbody>
+        <table class="demo-table"><thead><tr><th>Fahrzeug</th><th>Zuordnung</th><th>Start</th><th>Geschwindigkeit</th><th>Fahrzeiten</th><th>Status</th><th>Aktionen</th></tr></thead><tbody>
         <?php foreach ($this->vehicles as $vehicle): ?><tr>
             <td><?php echo $escape($vehicle->name); ?><br><small><?php echo $escape($vehicle->tracker_unique_id); ?></small></td>
             <td><?php echo $vehicle->user_id ? $escape($vehicle->assigned_user_name . ' – ' . $vehicle->assigned_username) : '<strong>Frei</strong>'; ?><?php if ($vehicle->fixed_assignment): ?><br><small>Fest zugeordnet</small><?php endif; ?></td>
-            <td><?php echo $escape($vehicle->start_address); ?></td><td><?php echo (int) $vehicle->minimum_speed_kmh; ?>–<?php echo (int) $vehicle->maximum_speed_kmh; ?> km/h</td><td class="sync-<?php echo $escape($vehicle->sync_status); ?>"><?php echo $escape($vehicle->sync_status); ?></td>
+            <td><?php echo $escape($vehicle->start_address); ?></td><td><?php echo (int) $vehicle->minimum_speed_kmh; ?>–<?php echo (int) $vehicle->maximum_speed_kmh; ?> km/h</td>
+            <td><?php $dayNames=['Mo','Di','Mi','Do','Fr','Sa','So']; echo $escape(implode(', ', array_map(static fn ($day) => $dayNames[(int) $day] ?? '', explode(',', (string) $vehicle->working_weekdays)))); ?><br><small><?php echo $escape(substr((string) $vehicle->workday_start, 0, 5)); ?>–<?php echo $escape(substr((string) $vehicle->workday_end, 0, 5)); ?> Uhr · Pause <?php echo (int) $vehicle->minimum_stop_minutes; ?>–<?php echo (int) $vehicle->maximum_stop_minutes; ?> Min.</small></td>
+            <td class="status-<?php echo $escape($vehicle->display_status_class); ?>"><strong><?php echo $escape($vehicle->display_status); ?></strong><br><small>Nächste Abfahrt: <?php echo $escape($vehicle->next_departure); ?></small></td>
             <td><div class="demo-actions">
                 <a class="demo-button" href="index.php?option=com_gpsportal&view=demovehicles&edit=<?php echo (int) $vehicle->device_id; ?>">Bearbeiten</a>
                 <form method="post"><input type="hidden" name="demo_action" value="assign_vehicle"><input type="hidden" name="device_id" value="<?php echo (int) $vehicle->device_id; ?>"><select name="user_id" required><option value="">Benutzer wählen</option><?php foreach ($this->users as $user): ?><option value="<?php echo (int) $user->id; ?>"<?php echo (int) $vehicle->user_id === (int) $user->id ? ' selected' : ''; ?>><?php echo $escape($user->name); ?></option><?php endforeach; ?></select><label><input type="checkbox" name="fixed_assignment" value="1"<?php echo $vehicle->fixed_assignment ? ' checked' : ''; ?>> fest</label><button class="demo-button">Zuordnen</button><?php echo HTMLHelper::_('form.token'); ?></form>

@@ -17,6 +17,7 @@ final class HtmlView extends BaseHtmlView
     public array $users = [];
     public array $vehicles = [];
     public ?object $editVehicle = null;
+    public object $scheduleSettings;
 
     public function display($tpl = null): void
     {
@@ -25,6 +26,7 @@ final class HtmlView extends BaseHtmlView
         $this->customers = $model->getCustomers();
         $this->users = $model->getUsers();
         $this->vehicles = $model->getDemoVehicles();
+        $this->scheduleSettings = $model->getScheduleSettings();
         $this->editVehicle = $model->getDemoVehicle(
             (int) Factory::getApplication()->input->getInt('edit', 0)
         );
