@@ -6,6 +6,7 @@ defined('_JEXEC') or die;
 
 use Joomla\CMS\Factory;
 use Joomla\CMS\MVC\Controller\BaseController;
+use TKKundendienst\Component\Gpsportal\Site\Service\UserSettingsService;
 
 class SettingsController extends BaseController
 {
@@ -17,6 +18,14 @@ class SettingsController extends BaseController
             ->get('DatabaseDriver');
 
         $user = $app->getIdentity();
+        $userSettingsService = new UserSettingsService();
+        $userSettingsService->ensureTripStopMinutesColumn();
+        $tripStopMinutes = $userSettingsService->normaliseTripStopMinutes(
+            $app->input->getInt(
+                'trip_stop_minutes',
+                UserSettingsService::DEFAULT_TRIP_STOP_MINUTES
+            )
+        );
 
         $showVehicleNames =
             $app->input->getInt(
@@ -107,6 +116,11 @@ class SettingsController extends BaseController
                 )
 
                 ->set(
+                    'trip_stop_minutes='
+                    . (int) $tripStopMinutes
+                )
+
+                ->set(
                     'show_geofences='
                     . (int) $showGeofences
                 )
@@ -160,6 +174,9 @@ class SettingsController extends BaseController
 
                 'vehicle_display_mode'
                     => $vehicleDisplayMode,
+
+                'trip_stop_minutes'
+                    => (int) $tripStopMinutes,
 
                 'show_geofences'
                     => (int) $showGeofences,

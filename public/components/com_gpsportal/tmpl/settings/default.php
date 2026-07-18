@@ -14,6 +14,27 @@ defined('_JEXEC') or die;
     <h2>Kartenansicht</h2>
 
     <p>
+        <label for="trip_stop_minutes">
+            <strong>Neue Tour nach Stillstand</strong>
+        </label><br>
+        <input
+            type="number"
+            name="trip_stop_minutes"
+            id="trip_stop_minutes"
+            min="5"
+            max="180"
+            step="5"
+            value="<?php echo (int) ($this->settings->trip_stop_minutes ?? 45); ?>"
+            required
+        >
+        Minuten<br>
+        <small>
+            Nach dieser Pausenzeit wird die Fahrt beendet.
+            Die Einstellung gilt nur für Ihren Benutzer.
+        </small>
+    </p>
+
+    <p>
 <label for="vehicle_display_mode"><strong>Fahrzeugbezeichnung</strong></label><br>
 <select name="vehicle_display_mode" id="vehicle_display_mode">
 <option value="name" <?php echo (($this->settings->vehicle_display_mode ?? 'name') === 'name') ? 'selected' : ''; ?>>Fahrzeugname</option>

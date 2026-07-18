@@ -521,6 +521,80 @@ class TraccarModel
         return $positions;
     }
 
+    /**
+     * Lädt die kompakten Traccar-Tourberichte für einen Zeitraum.
+     * Diese Abfrage wird für den Kalender verwendet und vermeidet,
+     * einen ganzen Monat voller Rohpositionen in den Speicher zu laden.
+     */
+    public function getTrips(
+        int $deviceId,
+        string $from,
+        string $to
+    ): array {
+        if ($deviceId <= 0) {
+            return [];
+        }
+
+        if (!$this->isSuperUser()) {
+            $allowedIds = $this->getAllowedTraccarDeviceIds();
+
+            if (!in_array($deviceId, $allowedIds, true)) {
+                return [];
+            }
+        }
+
+        return $this->request(
+            '/api/reports/trips?'
+            . http_build_query([
+                'deviceId' => $deviceId,
+                'from' => $from,
+                'to' => $to,
+            ])
+        );
+    }
+
+    /**
+     * Ermittelt zuerst den kleinen Tourbericht und lädt anschließend nur
+     * die Positionen der letzten konkreten Tour.
+     */
+    public function getLatestTripPositions(
+        int $deviceId,
+        int $lookbackDays = 7
+    ): array {
+        $to = date(DATE_ATOM, strtotime('+5 minutes'));
+        $from = date(
+            DATE_ATOM,
+            strtotime('-' . max(1, $lookbackDays) . ' days')
+        );
+        $trips = $this->getTrips($deviceId, $from, $to);
+
+        if (empty($trips)) {
+            return [];
+        }
+
+        $latestTrip = $trips[count($trips) - 1];
+        $tripFrom = (string) (
+            $latestTrip['startTime']
+            ?? $latestTrip['start_time']
+            ?? ''
+        );
+        $tripTo = (string) (
+            $latestTrip['endTime']
+            ?? $latestTrip['end_time']
+            ?? $to
+        );
+
+        if ($tripFrom === '' || strtotime($tripFrom) === false) {
+            return [];
+        }
+
+        if ($tripTo === '' || strtotime($tripTo) === false) {
+            $tripTo = $to;
+        }
+
+        return $this->getHistory($deviceId, $tripFrom, $tripTo);
+    }
+
     public function getAddress(
         float $latitude,
         float $longitude

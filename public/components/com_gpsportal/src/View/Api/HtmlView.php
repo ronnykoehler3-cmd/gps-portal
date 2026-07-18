@@ -7,6 +7,8 @@ defined('_JEXEC') or die;
 use Joomla\CMS\Factory;
 use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
 use TKKundendienst\Component\Gpsportal\Site\Model\TraccarModel;
+use TKKundendienst\Component\Gpsportal\Site\Service\TripService;
+use TKKundendienst\Component\Gpsportal\Site\Service\UserSettingsService;
 
 class HtmlView extends BaseHtmlView
 {
@@ -118,6 +120,37 @@ class HtmlView extends BaseHtmlView
 
         unset($device);
 
+        $trail = null;
+        $trailDeviceId = (int) $app->input->getInt('trailDevice');
+
+        if ($trailDeviceId > 0) {
+            $trailPositions = array_slice(
+                $model->getLatestTripPositions($trailDeviceId),
+                -4000
+            );
+            $tripEndStopMinutes = (new UserSettingsService())
+                ->getTripStopMinutes((int) $user->id);
+            $analysis = (new TripService())->analyse(
+                $trailPositions,
+                $tripEndStopMinutes
+            );
+            $trips = $analysis['trips'];
+
+            if (!empty($trips)) {
+                $latestTrip = $trips[count($trips) - 1];
+                $trail = [
+                    'trip' => $latestTrip,
+                    'stops' => array_values(
+                        array_filter(
+                            $analysis['stops'],
+                            static fn (array $stop): bool =>
+                                $stop['timestamp'] >= $latestTrip['startTimestamp']
+                        )
+                    ),
+                ];
+            }
+        }
+
         echo json_encode(
             [
                 'devices' =>
@@ -131,6 +164,9 @@ class HtmlView extends BaseHtmlView
 
                 'geofenceEvents' =>
                     $events,
+
+                'trail' =>
+                    $trail,
             ],
             JSON_UNESCAPED_UNICODE
             | JSON_UNESCAPED_SLASHES

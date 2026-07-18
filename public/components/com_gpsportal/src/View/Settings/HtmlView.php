@@ -37,6 +37,7 @@ class HtmlView extends BaseHtmlView
                 'show_geofences'        => 1,
                 'remember_map_position' => 1,
                 'refresh_interval'      => 5,
+                'trip_stop_minutes'     => 45,
 
                 'popup_geofence_events' => 1,
                 'popup_offline_events'  => 0,

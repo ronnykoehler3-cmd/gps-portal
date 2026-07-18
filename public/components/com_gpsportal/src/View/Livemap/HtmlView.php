@@ -8,6 +8,8 @@ use Joomla\CMS\Factory;
 use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
 use TKKundendienst\Component\Gpsportal\Site\Model\TraccarModel;
 use TKKundendienst\Component\Gpsportal\Site\Model\GeofencesModel;
+use TKKundendienst\Component\Gpsportal\Site\Service\TripService;
+use TKKundendienst\Component\Gpsportal\Site\Service\UserSettingsService;
 
 class HtmlView extends BaseHtmlView
 {
@@ -16,6 +18,8 @@ class HtmlView extends BaseHtmlView
     public $vehicleMeta = [];
     public $traccarUserId = null;
     public $geofences = [];
+    public $trails = [];
+    public $tripEndStopMinutes = UserSettingsService::DEFAULT_TRIP_STOP_MINUTES;
 
     public $showGeofences = true;
     public $rememberMapPosition = true;
@@ -38,6 +42,50 @@ class HtmlView extends BaseHtmlView
 
         $this->vehicleMeta =
             $model->getVehicleMeta();
+
+        /*
+         * Beim Öffnen der Livekarte wird die aktuelle beziehungsweise
+         * zuletzt abgeschlossene Tour serverseitig geladen. Die Spur ist
+         * dadurch auch nach Abmeldung, Browserwechsel oder neuem Login da.
+         */
+        $tripService = new TripService();
+        $this->tripEndStopMinutes = (new UserSettingsService())
+            ->getTripStopMinutes();
+        $initialDeviceId = (int) Factory::getApplication()
+            ->input
+            ->getInt('trail_device');
+
+        if ($initialDeviceId <= 0 && !empty($this->positions)) {
+            $initialDeviceId = (int) ($this->positions[0]['deviceId'] ?? 0);
+        }
+
+        if ($initialDeviceId > 0) {
+            $trailPositions = $model->getLatestTripPositions(
+                $initialDeviceId
+            );
+
+            /* Höchstens 4.000 Punkte gleichzeitig im Seitenaufbau. */
+            $trailPositions = array_slice($trailPositions, -4000);
+            $analysis = $tripService->analyse(
+                $trailPositions,
+                $this->tripEndStopMinutes
+            );
+            $trips = $analysis['trips'];
+
+            if (!empty($trips)) {
+                $lastTrip = $trips[count($trips) - 1];
+                $this->trails[$initialDeviceId] = [
+                    'trip' => $lastTrip,
+                    'stops' => array_values(
+                        array_filter(
+                            $analysis['stops'],
+                            static fn (array $stop): bool =>
+                                $stop['timestamp'] >= $lastTrip['startTimestamp']
+                        )
+                    ),
+                ];
+            }
+        }
 
         $db = Factory::getContainer()
             ->get('DatabaseDriver');
