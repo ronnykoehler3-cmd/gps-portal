@@ -225,24 +225,12 @@ Start-Process `
 Start-Sleep -Seconds 1
 
 $winScpLog = Join-Path $releaseDirectory 'winscp-upload.log'
-$remotePackageTemporary = "$packageName.uploading"
-$remoteChecksumTemporary = "$checksumName.uploading"
-$remoteManifestTemporary = 'latest.json.uploading'
-
 $commands = @(
     "open `"$WinScpSession`"",
     "cd `"$RemoteDirectory`"",
-    "put `"$packageFile`" `"$remotePackageTemporary`"",
-    "put `"$checksumFile`" `"$remoteChecksumTemporary`"",
-    "put `"$latestFile`" `"$remoteManifestTemporary`"",
-    'option batch continue',
-    "rm `"$packageName`"",
-    "rm `"$checksumName`"",
-    'rm "latest.json"',
-    'option batch abort',
-    "mv `"$remotePackageTemporary`" `"$packageName`"",
-    "mv `"$remoteChecksumTemporary`" `"$checksumName`"",
-    "mv `"$remoteManifestTemporary`" `"latest.json`"",
+    "put `"$packageFile`" `"$packageName`"",
+    "put `"$checksumFile`" `"$checksumName`"",
+    "put `"$latestFile`" `"latest.json`"",
     'exit'
 )
 
