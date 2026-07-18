@@ -268,13 +268,30 @@ $checkUrl = Route::_(
 
             <div class="update-value">
                 <?php
-                echo !empty(
+                if (!empty(
                     $status[
                         'update_server_configured'
                     ]
-                )
-                    ? 'Konfiguriert'
-                    : 'Lokaler Test';
+                )) {
+                    echo 'Zentraler Updateserver';
+
+                    $updateServerUrl = trim(
+                        (string) (
+                            $version['update_server']
+                            ?? ''
+                        )
+                    );
+
+                    if ($updateServerUrl !== '') {
+                        echo '<div style="font-size:13px;'
+                            . 'margin-top:8px;'
+                            . 'overflow-wrap:anywhere;">'
+                            . $escape($updateServerUrl)
+                            . '</div>';
+                    }
+                } else {
+                    echo 'Nicht konfiguriert';
+                }
                 ?>
             </div>
         </div>
@@ -302,7 +319,7 @@ $checkUrl = Route::_(
             <?php else: ?>
 
                 <div class="update-status-row">
-                    <span>Verfuegbare Version</span>
+                    <span>Verfügbare Version</span>
 
                     <span class="<?php
                     echo $updateCheck['update_available']
@@ -329,7 +346,7 @@ $checkUrl = Route::_(
                     ?>">
                         <?php
                         echo $updateCheck['update_available']
-                            ? 'Update verfuegbar'
+                            ? 'Update verfügbar'
                             : 'System aktuell';
                         ?>
                     </span>
@@ -368,8 +385,8 @@ $checkUrl = Route::_(
         echo !empty(
             $updateCheck['checksum_valid']
         )
-            ? 'Gueltig'
-            : 'Ungueltig';
+            ? 'Gültig'
+            : 'Ungültig';
         ?>
     </span>
 </div>
@@ -388,8 +405,8 @@ $checkUrl = Route::_(
         echo !empty(
             $updateCheck['zip_valid']
         )
-            ? 'Gueltig'
-            : 'Ungueltig';
+            ? 'Gültig'
+            : 'Ungültig';
         ?>
     </span>
 </div>

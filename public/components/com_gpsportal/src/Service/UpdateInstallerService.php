@@ -24,7 +24,7 @@ class UpdateInstallerService
     ): array {
         if (!class_exists(ZipArchive::class)) {
             throw new RuntimeException(
-                'Die PHP-ZIP-Erweiterung ist nicht verf?gbar.'
+                'Die PHP-ZIP-Erweiterung ist nicht verfügbar.'
             );
         }
 
@@ -55,7 +55,7 @@ class UpdateInstallerService
 
         if (empty($checkResult['update_available'])) {
             throw new RuntimeException(
-                'Es ist kein neueres Update verf?gbar.'
+                'Es ist kein neueres Update verfügbar.'
             );
         }
 
@@ -163,7 +163,7 @@ class UpdateInstallerService
                     )
             ) {
                 throw new RuntimeException(
-                    'Die Version in package.json stimmt nicht mit dem Manifest ?berein.'
+                    'Die Version in package.json stimmt nicht mit dem Manifest überein.'
                 );
             }
 
@@ -231,6 +231,22 @@ class UpdateInstallerService
                 );
             }
 
+            /*
+             * Dateistatus und OPcache leeren, damit die neu installierte
+             * version.php sofort und nicht aus dem Cache gelesen wird.
+             */
+            clearstatcache(
+                true,
+                $installedVersionFile
+            );
+
+            if (function_exists('opcache_invalidate')) {
+                opcache_invalidate(
+                    $installedVersionFile,
+                    true
+                );
+            }
+
             $newVersionInformation =
                 require $installedVersionFile;
 
@@ -293,7 +309,7 @@ class UpdateInstallerService
                 'note' =>
                     empty($detectedMigrations)
                         ? 'Es waren keine Datenbankmigrationen enthalten.'
-                        : 'Enthaltene Datenbankmigrationen wurden im ersten Testlauf bewusst noch nicht automatisch ausgef?hrt.',
+                        : 'Enthaltene Datenbankmigrationen wurden im ersten Testlauf bewusst noch nicht automatisch ausgeführt.',
             ];
         } catch (Throwable $exception) {
             throw new RuntimeException(

@@ -26,7 +26,7 @@ class UpdateBackupValidator
             ) !== 1
         ) {
             throw new RuntimeException(
-                'Der Backup-Dateiname ist ung?ltig.'
+                'Der Backup-Dateiname ist ungültig.'
             );
         }
 
@@ -61,7 +61,7 @@ class UpdateBackupValidator
 
         if (!class_exists(ZipArchive::class)) {
             throw new RuntimeException(
-                'Die PHP-ZIP-Erweiterung ist nicht verf?gbar.'
+                'Die PHP-ZIP-Erweiterung ist nicht verfügbar.'
             );
         }
 
@@ -91,7 +91,7 @@ class UpdateBackupValidator
 
         if ($openResult !== true) {
             throw new RuntimeException(
-                'Das Backup ist keine g?ltige ZIP-Datei.'
+                'Das Backup ist keine gültige ZIP-Datei.'
             );
         }
 
@@ -197,7 +197,7 @@ class UpdateBackupValidator
                         }
                     } catch (\JsonException) {
                         $missingEntries[] =
-                            'g?ltiges backup-manifest.json';
+                            'gültiges backup-manifest.json';
                     }
                 }
             }

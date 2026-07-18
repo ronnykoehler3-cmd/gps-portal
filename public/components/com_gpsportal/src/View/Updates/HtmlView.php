@@ -14,6 +14,9 @@ use TKKundendienst\Component\Gpsportal\Site\Service\UpdateService;
 
 class HtmlView extends BaseHtmlView
 {
+    private const UPDATE_MANIFEST_URL =
+        'http://update.tk-kundendienst.de/GPS-Portal/latest.json';
+
     public array $versionInfo = [];
     public array $systemStatus = [];
     public ?array $updateCheck = null;
@@ -42,7 +45,7 @@ class HtmlView extends BaseHtmlView
 
         if (!$isUpdateAdministrator) {
             throw new \RuntimeException(
-                'Sie besitzen keine Berechtigung fuer den Updatebereich.',
+                'Sie besitzen keine Berechtigung für den Updatebereich.',
                 403
             );
         }
@@ -53,7 +56,7 @@ class HtmlView extends BaseHtmlView
             'channel' => 'Unbekannt',
             'build' => 'Unbekannt',
             'released_at' => 'Unbekannt',
-            'update_server' => '',
+            'update_server' => self::UPDATE_MANIFEST_URL,
         ];
 
         $versionFile =
@@ -146,7 +149,7 @@ class HtmlView extends BaseHtmlView
         ) {
             if (!Session::checkToken('post')) {
                 throw new \RuntimeException(
-                    'Die Sicherheitspruefung ist fehlgeschlagen.',
+                    'Die Sicherheitsprüfung ist fehlgeschlagen.',
                     403
                 );
             }
@@ -182,7 +185,7 @@ class HtmlView extends BaseHtmlView
 
                 $manifestFile =
                     JPATH_SITE
-                    . '/components/com_gpsportal/update/manifest.json';
+                    . '/storage/updates/packages/manifest.json';
 
                 $this->installationResult =
                     $installerService
@@ -261,7 +264,7 @@ class HtmlView extends BaseHtmlView
         ) {
             if (!Session::checkToken('post')) {
                 throw new \RuntimeException(
-                    'Die Sicherheitspruefung ist fehlgeschlagen.',
+                    'Die Sicherheitsprüfung ist fehlgeschlagen.',
                     403
                 );
             }
@@ -294,14 +297,12 @@ class HtmlView extends BaseHtmlView
                     $this->versionInfo
                 );
 
-            $manifestFile =
-                JPATH_SITE
-                . '/components/com_gpsportal/update/manifest.json';
-
             $this->updateCheck =
                 $updateService
-                    ->checkLocalManifest(
-                        $manifestFile
+                    ->checkRemoteManifest(
+                        self::UPDATE_MANIFEST_URL,
+                        JPATH_SITE
+                        . '/storage/updates/packages'
                     );
         }
 
