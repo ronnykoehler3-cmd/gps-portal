@@ -29,6 +29,8 @@ $isAdministrator =
             'com_gpsportal'
         )
     );
+
+$logoutReturnUrl = 'index.php?option=com_users&view=login';
 ?>
 
 <aside class="gps-sidebar">
@@ -103,25 +105,24 @@ $isAdministrator =
         </div>
 
         <form
-    action="<?php echo Route::_('index.php?option=com_users&task=user.logout'); ?>"
-    method="post"
->
+            action="<?php echo Route::_('index.php?option=com_users&task=user.logout', false); ?>"
+            method="post"
+        >
 
-    <button
-        type="submit"
-        class="logout-btn sidebar-logout"
-    >
-        Logout
-    </button>
+            <button
+                type="submit"
+                class="logout-btn sidebar-logout"
+            >
+                Logout
+            </button>
 
-    <input
-        type="hidden"
-        name="return"
-        value="<?php echo base64_encode('index.php'); ?>"
-    >
+            <input
+                type="hidden"
+                name="return"
+                value="<?php echo base64_encode($logoutReturnUrl); ?>"
+            >
 
-    <?php echo HTMLHelper::_('form.token'); ?>
-
+            <?php echo HTMLHelper::_('form.token'); ?>
 
         </form>
 
